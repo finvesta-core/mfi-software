@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        .header-center p {
+            margin: 3px 0 0;
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+        .home-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .home-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Hamburger Menu */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: white;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.1);
+            margin-top: 90px;
+            padding: 15px 0;
+            height: calc(100vh - 90px);
+            overflow-y: auto;
+            border-right: 1px solid #e9ecef;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 900;
+            transition: transform 0.3s ease;
+        }
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .menu-item > a {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            color: #495057;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            border-left: 4px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .menu-item > a i {
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+        }
+        .menu-item > a:hover {
+            background: #007bff;
+            color: white;
+            border-left-color: #0056b3;
+        }
+
+        .submenu {
+            display: none;
+            background: rgba(0, 123, 255, 0.05);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease;
+        }
+        .menu-item.active .submenu {
+            display: block;
+            max-height: 500px;
+            padding-left: 20px;
+        }
+        .submenu li {
+            padding: 10px 20px;
+        }
+        .submenu li a {
+            color: #6c757d;
+            text-decoration: none;
+            font-size: 0.93rem;
+        }
+        .submenu li a:hover {
+            color: #007bff;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-top: 90px;
+            margin-left: 280px;
+            padding: 25px;
+            transition: margin-left 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .chart-title {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        /* Print Loan Section */
+        #printLoanSection, #loanDocument {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.1);
+            margin: 15px 0;
+        }
+        .search-form {
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .search-form label {
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .search-form input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .search-form button {
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .search-form button:hover {
+            background: #0056b3;
+        }
+
+        /* Footer */
+        footer {
+            background: #1a3d7c;
+            color: white;
+            text-align: center;
+            padding: 15px 20px;
+            font-size: 0.9rem;
+            margin-top: auto;
+            width: 100%;
+        }
+        footer p {
+            margin: 0;
+            font-weight: 500;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 260px;
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .menu-toggle {
+                display: block;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .header-center h1 {
+                font-size: 1.1rem;
+            }
+            .header-center p {
+                font-size: 0.75rem;
+            }
+            .home-button {
+                padding: 6px 10px;
+                font-size: 0.8rem;
+            }
+            .logo {
+                width: 40px;
+                height: 40px;
+            }
+            .chart-container, #printLoanSection, #loanDocument {
+                padding: 15px;
+            }
+            .chart-title {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            #loanDocument, #loanDocument * { visibility: visible; }
+            #loanDocument { 
+                position: absolute; 
+                left: 0; top: 0; 
+                width: 100%; 
+                margin: 0; 
+                padding: 20px; 
+            }
+            header, .sidebar, footer, .menu-toggle { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <button class="menu-toggle" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='fin.jpg') }}" alt="Logo" class="logo">
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012 | finvesta.core@gmail.com</p>
+        </div>
+        <a href="/" class="home-button" onclick="showHome()">
+            <i class="fas fa-home"></i> Home
+        </a>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <ul>
+            <li class="menu-item" onclick="toggleSubmenu(this)">
+                <a href="#"><i class="fas fa-users"></i>1 - Member</a>
+                <ul class="submenu">
+                    <li><a href="/add_member">Add Member</a></li>
+                    <li><a href="/member/details">Member Details</a></li>
+                </ul>
+            </li>
+            <li class="menu-item" onclick="toggleSubmenu(this)">
+                <a href="#"><i class="fas fa-hand-holding-usd"></i>2 - Loan</a>
+                <ul class="submenu">
+                    <li><a href="/add_loan">New Loan</a></li>
+                    <li><a href="/loan_list">View Loans</a></li>
+                    <li><a href="{{ url_for('print_loan') }}">Print Loan Document</a></li>
+                </ul>
+            </li>
+            <li class="menu-item" onclick="toggleSubmenu(this)">
+                <a href="#"><i class="fas fa-credit-card"></i>3 - EMI</a>
+                <ul class="submenu">
+                    <li><a href="/pay_emi">Pay EMI</a></li>
+                    <li><a href="/pay_advance">Pay Advance</a></li>
+                    <li><a href="/loan_settlement">Loan Settlement</a></li>
+                </ul>
+            </li>
+            <li class="menu-item" onclick="toggleSubmenu(this)">
+                <a href="#"><i class="fas fa-chart-bar"></i>4 - Reports</a>
+                <ul class="submenu">
+                    <li><a href="/emi_due_report">EMI Due Report</a></li>
+                    <li><a href="/loan_dispatch_report">Loan Dispatched</a></li>
+                    <li><a href="{{ url_for('bank_report') }}">Bank Report</a></li>
+                    <li><a href="{{ url_for('member_ledger_report') }}">Member Ledger</a></li>
+                    <li><a href="{{ url_for('legal_notice') }}">Legal Notice</a></li>
+                </ul>
+            </li>
+            <li class="menu-item" onclick="toggleSubmenu(this)">
+                <a href="#"><i class="fas fa-building"></i>5 - Company</a>
+                <ul class="submenu">
+                    <li><a href="{{ url_for('balance_sheet_report') }}">Balance Sheet</a></li>
+                    <li><a href="{{ url_for('cash_deposit') }}">Deposit Cash</a></li>
+                    <li><a href="{{ url_for('profit_loss_report') }}">Profit & Loss</a></li>
+                    <li><a href="/investments_expenses">Investment & Expenses</a></li>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div id="homeContent" class="chart-container">
+            <h2 class="chart-title">Last Two Days Collections & Loan Dispatched</h2>
+            <canvas id="comparisonChart"></canvas>
+        </div>
+
+        <!-- Print Loan Section -->
+        <div id="printLoanSection">
+            <h2>Print Loan Document</h2>
+            <form class="search-form" onsubmit="searchAndPrintLoan(event)">
+                <label for="loanNo">Loan No. दर्ज करें:</label>
+                <input type="text" id="loanNo" placeholder="उदाहरण: PL0079" required>
+                <button type="submit">सर्च करें और प्रिंट</button>
+            </form>
+        </div>
+
+        <div id="loanDocument">
+            <h2>Loan Document - PL0079</h2>
+            <p><strong>Borrower:</strong> राम सिंह</p>
+            <p><strong>Loan Amount:</strong> ₹50,000</p>
+            <p><strong>EMI:</strong> ₹4,500 x 12 महीने</p>
+            <p><strong>Date:</strong> 25/10/2025</p>
+            <button onclick="window.print()">Print</button>
+            <button onclick="hideDocument()" style="background:#dc3545;">Cancel</button>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>© 2025 FINVESTACORE SMALL CAPITAL PVT LTD. All Rights Reserved.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Toggle Sidebar
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        // Toggle Submenu
+        function toggleSubmenu(element) {
+            element.classList.toggle('active');
+        }
+
+        // Show Home
+        function showHome() {
+            document.getElementById('homeContent').style.display = 'block';
+            document.getElementById('printLoanSection').style.display = 'none';
+            document.getElementById('loanDocument').style.display = 'none';
+            document.getElementById('sidebar').classList.remove('active');
+        }
+
+        // Search and Print Loan
+        function searchAndPrintLoan(event) {
+            event.preventDefault();
+            const loanNo = document.getElementById('loanNo').value.trim().toUpperCase();
+            if (loanNo === 'PL0079') {
+                document.getElementById('printLoanSection').style.display = 'none';
+                document.getElementById('loanDocument').style.display = 'block';
+                setTimeout(() => window.print(), 500);
+            } else {
+                alert('Loan No. नहीं मिला! सही नंबर डालें।');
+            }
+        }
+
+        function hideDocument() {
+            document.getElementById('loanDocument').style.display = 'none';
+            document.getElementById('printLoanSection').style.display = 'block';
+        }
+
+        // Chart
+        const ctx = document.getElementById('comparisonChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Yesterday (25/10)', 'Day Before (24/10)'],
+                datasets: [
+                    {
+                        label: 'Collections (EMI)',
+                        data: [50000, 45000],
+                        backgroundColor: 'rgba(75, 192, 192, 0.3)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Loan Dispatched',
+                        data: [100000, 80000],
+                        backgroundColor: 'rgba(255, 99, 132, 0.3)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.querySelector('.menu-toggle');
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target) && sidebar.classList.contains('active')) {
+                sidebar.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

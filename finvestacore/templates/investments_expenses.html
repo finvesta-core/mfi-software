@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investments & Expenses - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .header-center p {
+            margin: 5px 0 0 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .back-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 100px auto 20px;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        .form-section {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 300px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #007bff;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .form-group textarea {
+            height: 60px;
+            resize: vertical;
+        }
+        .form-group button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .form-group button:hover {
+            background: #218838;
+        }
+        #reportsSection {
+            margin-top: 30px;
+        }
+        #reportsSection h3 {
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        #reportTable {
+            width: 100%;
+            border-collapse: collapse;
+            background: #f8f9fa;
+        }
+        #reportTable th, #reportTable td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        #reportTable th {
+            background: #007bff;
+            color: white;
+        }
+        #reportTable tr:hover {
+            background: #e9ecef;
+        }
+        .income {
+            color: #28a745;
+        }
+        .expense {
+            color: #dc3545;
+        }
+        .totals {
+            font-weight: bold;
+            text-align: right;
+            margin-top: 10px;
+        }
+        @media (max-width: 768px) {
+            .form-section {
+                flex-direction: column;
+            }
+            .container {
+                margin: 100px 10px 20px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='fin.jpg') }}" alt="FINVESTACORE Logo" class="logo">
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012, Email- finvesta.core@gmail.com</p>
+        </div>
+        <a href="/" class="back-button" title="Back to Home">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </header>
+
+    <div class="container">
+        <h2>Investments & Expenses Management</h2>
+        
+        <!-- Add Investment Form -->
+        <div class="form-section">
+            <div class="form-group">
+                <h3>Add Investment</h3>
+                <form id="investmentForm">
+                    <label for="investDate">Date:</label>
+                    <input type="date" id="investDate" name="date" required>
+                    <label for="investType">Type:</label>
+                    <select id="investType" name="type" required>
+                        <option value="">Select Type</option>
+                        <option value="capital">Capital Injection</option>
+                        <option value="borrowing">Borrowing</option>
+                    </select>
+                    <input type="hidden" name="payment_mode" value="UPI">
+                    <label for="investAmount">Amount (₹):</label>
+                    <input type="number" id="investAmount" name="amount" step="0.01" required>
+                    <label for="investDesc">Description:</label>
+                    <textarea id="investDesc" name="description"></textarea>
+                    <button type="submit">Add Investment</button>
+                </form>
+            </div>
+            
+            <!-- Add Expense Form -->
+            <div class="form-group">
+                <h3>Add Expense</h3>
+                <form id="expenseForm">
+                    <label for="expenseDate">Date:</label>
+                    <input type="date" id="expenseDate" name="date" required>
+                    <label for="expenseCategory">Category:</label>
+                    <select id="expenseCategory" name="category" required>
+                        <option value="">Select Category</option>
+                        <option value="salary">Salary</option>
+                        <option value="rent">Rent</option>
+                        <option value="utilities">Utilities</option>
+                        <option value="office_supplies">Office Supplies</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="legal_fees">Legal Fees</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <label for="expenseAmount">Amount (₹):</label>
+                    <input type="number" id="expenseAmount" name="amount" step="0.01" required>
+                    <label for="expenseDesc">Description:</label>
+                    <textarea id="expenseDesc" name="description"></textarea>
+                    <button type="submit">Add Expense</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reportsSection">
+            <h3>Investments & Expenses Report</h3>
+            <table id="reportTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type/Category</th>
+                        <th>Description</th>
+                        <th>Amount (₹)</th>
+                    </tr>
+                </thead>
+                <tbody id="reportBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+            <div class="totals">
+                <p>Total Investments: <span id="totalInvest" class="income">₹ 0</span></p>
+                <p>Total Expenses: <span id="totalExpense" class="expense">₹ 0</span></p>
+                <p>Net Cash Flow: <span id="netFlow" class="income">₹ 0</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set today's date as default (October 23, 2025)
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('investDate').value = today;
+        document.getElementById('expenseDate').value = today;
+
+        // Load initial report
+        loadReport();
+
+        // Investment Form Submit
+        document.getElementById('investmentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/add_investment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}\nResponse: ${text.substring(0, 200)}...`);
+                    });
+                }
+                return response.json();  
+            })
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Investment added successfully!');
+                    this.reset();
+                    document.getElementById('investDate').value = today;
+                    loadReport();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Full error:', error);
+                alert('Network/Server Error: ' + error.message);
+            });
+        });
+        
+        // Expense Form Submit
+        document.getElementById('expenseForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/add_expense', {
+                method: 'POST',
+                body: formData  // FormData for multipart/form-data
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Expense added successfully!');
+                    this.reset();
+                    document.getElementById('expenseDate').value = today;
+                    loadReport();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => alert('Network error: ' + error));
+        });
+
+        function loadReport() {
+            fetch('/get_invest_expense_report')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        console.error('Server error:', data.error);
+                        return;
+                    }
+                    const tbody = document.getElementById('reportBody');
+                    tbody.innerHTML = '';
+                    let totalInvest = 0;
+                    let totalExpense = 0;
+                    data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        const amountClass = row.type === 'investment' ? 'income' : 'expense';
+                        if (row.type === 'investment') totalInvest += row.amount;
+                        else totalExpense += row.amount;
+                        tr.innerHTML = `
+                            <td>${row.date}</td>
+                            <td>${row.type === 'investment' ? row.invest_type : row.expense_category}</td>
+                            <td>${row.description}</td>
+                            <td class="${amountClass}">₹ ${parseFloat(row.amount).toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    document.getElementById('totalInvest').textContent = `₹ ${totalInvest.toLocaleString()}`;
+                    document.getElementById('totalExpense').textContent = `₹ ${totalExpense.toLocaleString()}`;
+                    document.getElementById('netFlow').textContent = `₹ ${(totalInvest - totalExpense).toLocaleString()}`;
+                })
+                .catch(error => {
+                    console.error('Error loading report:', error);
+                    alert('Error loading report: ' + error.message);
+                });
+        }
+    </script>
+</body>
+</html>

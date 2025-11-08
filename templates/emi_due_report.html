@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMI Due Report - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .header-center p {
+            margin: 5px 0 0 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .back-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 100px auto 20px;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #007bff;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .form-group button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        .form-group button:hover {
+            background: #0056b3;
+        }
+        #reportSection {
+            margin-top: 20px;
+        }
+        #reportTable {
+            display: none;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #f8f9fa;
+        }
+        #reportTable th, #reportTable td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        #reportTable th {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        #reportTable tr:hover {
+            background: #e9ecef;
+        }
+        .due-highlight {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #007bff;
+        }
+        .error-msg {
+            color: #dc3545;
+            text-align: center;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        .print-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            transition: background 0.3s;
+        }
+        .print-btn:hover {
+            background: #218838;
+        }
+        .print-btn i {
+            margin-right: 5px;
+        }
+        @media (max-width: 768px) {
+            .container {
+                margin: 100px 10px 20px;
+                padding: 20px;
+            }
+            #reportTable {
+                font-size: 14px;
+            }
+            #reportTable th, #reportTable td {
+                padding: 8px;
+            }
+        }
+        /* Print Styles - Attractive Format */
+        @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .container { box-shadow: none; border: none; padding: 20px; max-width: none; }
+            header { display: none; }  /* Hide header in print */
+            .form-group { display: none; }  /* Hide form */
+            #reportSection { margin-top: 0; }
+            #reportTable { display: table !important; font-size: 12px; border: 2px solid #007bff; }
+            #reportTable th { background: #007bff !important; color: white; }
+            #reportTable td { border: 1px solid #ddd; }
+            .due-highlight { color: #dc3545 !important; background: #ffebee; }
+            .print-btn { display: none; }
+            /* Add attractive header for print */
+            @page { margin: 1in; }
+            h2 { text-align: center; color: #007bff; border-bottom: 3px solid #007bff; padding-bottom: 10px; }
+            #reportSection::before {
+                content: "EMI Due Report - Generated on: {{ current_date }}";
+                display: block;
+                text-align: center;
+                font-weight: bold;
+                color: #666;
+                margin-bottom: 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='fin.jpg') }}" alt="FINVESTACORE Logo" class="logo">
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012, Email- finvesta.core@gmail.com</p>
+        </div>
+        <a href="/" class="back-button" title="Back to Home">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </header>
+
+    <div class="container">
+        <h2>EMI Due Report</h2>
+        
+        <form id="reportForm">
+            <div class="form-group">
+                <label for="reportDate">Select Date (Till Date for Due Calculation):</label>
+                <input type="date" id="reportDate" name="report_date" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Search Report</button>
+            </div>
+        </form>
+
+        <!-- Report Section -->
+        <div id="reportSection">
+            <div id="loading" class="loading" style="display: none;">
+                <i class="fas fa-spinner fa-spin"></i> Loading Report...
+            </div>
+            <div id="errorMsg" class="error-msg" style="display: none;"></div>
+            <table id="reportTable">
+                <thead>
+                    <tr>
+                        <th>Loan ID</th>
+                        <th>Member Name</th>
+                        <th>Mobile No.</th>
+                        <th>Loan Amount</th>
+                        <th>Total Paid</th>
+                        <th>EMI Amount</th>
+                        <th>Due Amount Till Date</th>
+                        <th>Total Due Amount</th>
+                        <th>Total Due EMIs</th>  <!-- NEW COLUMN -->
+                    </tr>
+                </thead>
+                <tbody id="reportBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+            <div id="noData" class="no-data" style="display: none;">No data found for the selected date.</div>
+            <button id="printBtn" class="print-btn" onclick="printReport()" style="display: none;">
+                <i class="fas fa-print"></i> Print Report
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Set today's date as default
+        document.getElementById('reportDate').valueAsDate = new Date();
+
+        document.getElementById('reportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const reportDate = document.getElementById('reportDate').value;
+            if (!reportDate) {
+                alert('Please select a date');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('reportTable').style.display = 'none';
+            document.getElementById('printBtn').style.display = 'none';
+
+            // AJAX to fetch report data
+            fetch(`/get_emi_due_report?date=${reportDate}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    if (data.error) {
+                        document.getElementById('errorMsg').textContent = data.error;
+                        document.getElementById('errorMsg').style.display = 'block';
+                        return;
+                    }
+                    const tbody = document.getElementById('reportBody');
+                    tbody.innerHTML = '';  // Clear previous
+                    if (data.length === 0) {
+                        document.getElementById('noData').style.display = 'block';
+                        return;
+                    }
+                // Updated forEach loop with fallback for due_emi_count and new column
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.loan_id}</td>
+                        <td>${row.member_name}</td>
+                        <td>${row.mobile_no}</td>
+                        <td>₹ ${parseFloat(row.loan_amount || 0).toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
+                        <td>₹ ${parseFloat(row.total_paid || 0).toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
+                        <td>₹ ${parseFloat(row.emi_amount || 0).toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
+                        <td class="${parseFloat(row.due_till_date || 0) > 0 ? 'due-highlight' : ''}">₹ ${parseFloat(row.due_till_date || 0).toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
+                        <td class="${parseFloat(row.total_due || 0) > 0 ? 'due-highlight' : ''}">₹ ${parseFloat(row.total_due || 0).toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
+                        <td class="${(row.due_emi_count || 0) > 0 ? 'due-highlight' : ''}">${row.due_emi_count || 0}</td>  <!-- NEW: Total Due EMIs with fallback -->
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // Grand total row (sum of due_till_date, total_due, and due_emi_count)
+                let totalDueTillDate = data.reduce((sum, row) => sum + parseFloat(row.due_till_date || 0), 0);
+                let totalTotalDue = data.reduce((sum, row) => sum + parseFloat(row.total_due || 0), 0);
+                let totalDueEmis = data.reduce((sum, row) => sum + parseInt(row.due_emi_count || 0), 0);
+                const grandTr = document.createElement('tr');
+                grandTr.className = 'grand-total';
+                grandTr.innerHTML = `
+                    <td colspan="6"><strong>Grand Total:</strong></td>
+                    <td class="due-highlight"><strong>₹ ${totalDueTillDate.toLocaleString('en-IN', {maximumFractionDigits: 2})}</strong></td>
+                    <td class="due-highlight"><strong>₹ ${totalTotalDue.toLocaleString('en-IN', {maximumFractionDigits: 2})}</strong></td>
+                    <td><strong>${totalDueEmis}</strong></td>
+                `;
+                tbody.appendChild(grandTr);
+
+                    document.getElementById('reportTable').style.display = 'table';
+                    document.getElementById('printBtn').style.display = 'inline-block';  // Show print button
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('errorMsg').textContent = 'Error fetching report: ' + error;
+                    document.getElementById('errorMsg').style.display = 'block';
+                });
+        });
+
+        function printReport() {
+            window.print();  // Trigger print with attractive styles
+        }
+    </script>
+</body>
+</html>

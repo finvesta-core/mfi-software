@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay EMI - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .header-center p {
+            margin: 5px 0 0 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .back-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .container {
+            max-width: 800px;
+            margin: 100px auto 20px;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #007bff;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .form-group button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        .form-group button:hover {
+            background: #0056b3;
+        }
+        #memberDetails {
+            display: none;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        #memberDetails h3 {
+            color: #007bff;
+            margin-top: 0;
+        }
+        #memberDetails p {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        #receipt {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            border: 2px solid #007bff;
+        }
+        #receipt h2 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+        .receipt-header img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: block;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .receipt-header h3 {
+            margin: 5px 0;
+            color: #007bff;
+            font-size: 1.4em;
+        }
+        .receipt-header p {
+            margin: 2px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .receipt-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;  /* TWO COLUMNS */
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .column {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .column h3 {
+            color: #007bff;
+            margin-top: 0;
+            font-size: 1.1em;
+        }
+        .column p {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .column strong {
+            color: #333;
+        }
+        .receipt-footer {
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-style: italic;
+        }
+        .receipt-footer p {
+            margin: 5px 0;
+        }
+        .print-btn, .whatsapp-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.3s;
+        }
+        .print-btn {
+            background: #28a745;
+        }
+        .print-btn:hover {
+            background: #218838;
+        }
+        .whatsapp-btn {
+            background: #25D366;
+        }
+        .whatsapp-btn:hover {
+            background: #128C7E;
+        }
+        @media print {
+            body * { visibility: hidden; }
+            #receipt, #receipt * { visibility: visible; }
+            #receipt { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; box-shadow: none; border: none; }
+            #receipt button { display: none; }
+            .receipt-body { grid-template-columns: 1fr; gap: 10px; }  /* Single column for print */
+        }
+        @media (max-width: 768px) {
+            .container {
+                margin: 100px 10px 20px;
+                padding: 20px;
+            }
+            .receipt-body { grid-template-columns: 1fr; }  /* Single column on mobile */
+        }
+        /* NEW STYLES FOR EMI TABLE */
+        #emiPaymentsSection {
+            display: none;
+            margin-top: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #dc3545;
+        }
+        #emiPaymentsSection h3 {
+            color: #dc3545;
+            margin-top: 0;
+        }
+        #emiTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        #emiTable th, #emiTable td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        #emiTable th {
+            background: #dc3545;
+            color: white;
+        }
+        #emiTable tr:hover {
+            background: #f1f1f1;
+        }
+        .delete-last-btn, .export-csv-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .delete-last-btn:hover {
+            background: #c82333;
+        }
+        .export-csv-btn {
+            background: #28a745;
+        }
+        .export-csv-btn:hover {
+            background: #218838;
+        }
+        .delete-last-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .last-emi-info {
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 5px;
+            font-size: 14px;
+            color: #155724;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="/static/fin.jpg" alt="FINVESTACORE Logo" class="logo">
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012, Email- finvesta.core@gmail.com</p>
+        </div>
+        <a href="/" class="back-button" title="Back to Home">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </header>
+
+    <div class="container">
+        <h2>Pay EMI</h2>
+        
+        <form id="emiForm">
+            <div class="form-group">
+                <label for="memberSelect">Select Active Member:</label>
+                <select id="memberSelect" name="member_id" required onchange="loadMemberDetails()">
+                    <option value="">-- Select Member --</option>
+                    {% for member in active_members %}
+                    <option value="{{ member.member_id }}" data-mobile="{{ member.mobile }}">{{ member.member_id }} - {{ member.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="memberDetails">
+                <h3>Member Details</h3>
+                <p><strong>Member Name:</strong> <span id="memberName"></span></p>
+                <p><strong>Father's Name:</strong> <span id="fatherName"></span></p>
+                <p><strong>Loan Amount:</strong> <span id="loanAmount"></span></p>
+                <p><strong>Loan Date:</strong> <span id="loanDate"></span></p>
+                <p><strong>Total Paid:</strong> <span id="totalPaid"></span></p>
+                <p><strong>Due Amount:</strong> <span id="dueAmount"></span></p>
+            </div>
+
+            <div class="form-group">
+                <label for="payDate">Paying Date:</label>
+                <input type="date" id="payDate" name="pay_date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="paymentMode">Mode of Payment:</label>
+                <select id="paymentMode" name="payment_mode" required>
+                    <option value="">-- Select Mode --</option>
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="emiAmount">EMI Amount:</label>
+                <input type="number" id="emiAmount" name="emi_amount" required placeholder="Enter EMI Amount">
+                <div id="lastEmiDisplay" class="last-emi-info" style="display: none;">
+                    Last EMI Paid: ₹<span id="lastEmiAmount"></span> on <span id="lastEmiDate"></span> via <span id="lastEmiMode"></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="submit">Submit EMI Payment</button>
+            </div>
+        </form>
+
+        <!-- NEW: EMI Payments Table Section -->
+        <div id="emiPaymentsSection">
+            <h3>All Previous EMI Payments</h3>
+            <table id="emiTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Mode</th>
+                    </tr>
+                </thead>
+                <tbody id="emiTableBody">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+            <div class="button-group">
+                <button id="deleteLastEmiBtn" class="delete-last-btn" onclick="deleteLastEmi()" disabled>Delete Last Paid EMI</button>
+                <button id="exportCsvBtn" class="export-csv-btn" onclick="exportToCsv()" disabled>Export to CSV</button>
+            </div>
+        </div>
+
+        <!-- Receipt Section -->
+        <div id="receipt">
+            <div class="receipt-header">
+                <img src="/static/fin.jpg" alt="FINVESTACORE Logo">  <!-- COMPANY LOGO CENTER -->
+                <h3>FINVESTACORE SMALL CAPITAL PVT LTD</h3>  <!-- COMPANY NAME CENTER -->
+                <p>Purana Bazar, Budaun 243601, U.P.</p>
+                <p>M.-7253946012 | Email: finvesta.core@gmail.com</p>
+            </div>
+            
+            <h2>EMI Payment Receipt</h2>
+            <p><strong>CIN:</strong> U64820UP2024PTC209483</p>
+            
+            <div class="receipt-body">  <!-- TWO COLUMNS -->
+                <div class="column">
+                    <h3>Member & Loan Info</h3>
+                    <p><strong>Member ID:</strong> <span id="receiptMemberId"></span></p>
+                    <p><strong>Member Name:</strong> <span id="receiptMemberName"></span></p>
+                    <p><strong>Loan ID:</strong> <span id="receiptLoanId"></span></p>
+                </div>
+                <div class="column">
+                    <h3>Payment Info</h3>
+                    <p><strong>Pay Date:</strong> <span id="receiptPayDate"></span></p>
+                    <p><strong>Payment Mode:</strong> <span id="receiptPaymentMode"></span></p>
+                    <p><strong>EMI Amount Paid:</strong> <span id="receiptEmiAmount"></span></p>
+                    <p><strong>Updated Due Amount:</strong> <span id="receiptDueAmount"></span></p>
+                </div>
+            </div>
+            
+            <div class="receipt-footer">
+                <p>Receipt Date: 15/10/2025</p>
+                <p>Thank you for your payment!</p>
+                <p>Signature: ________________</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="print-btn" onclick="window.print()">Print Receipt</button>
+                <button class="whatsapp-btn" onclick="sendWhatsApp()">Send WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPayments = []; // Store payments for delete and export functionality
+        let currentMemberId = '';
+
+        // Set today's date as default
+        document.getElementById('payDate').valueAsDate = new Date();
+
+        function loadMemberDetails() {
+            const memberId = document.getElementById('memberSelect').value;
+            currentMemberId = memberId;
+            if (!memberId) {
+                document.getElementById('memberDetails').style.display = 'none';
+                document.getElementById('emiPaymentsSection').style.display = 'none';
+                document.getElementById('lastEmiDisplay').style.display = 'none';
+                return;
+            }
+
+            // AJAX to fetch details
+            fetch(`/get_member_details/${memberId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    document.getElementById('memberName').textContent = data.name;
+                    document.getElementById('fatherName').textContent = data.father_name;
+                    document.getElementById('loanAmount').textContent = `₹ ${data.loan_amount}`;
+                    document.getElementById('loanDate').textContent = data.loan_date;
+                    document.getElementById('totalPaid').textContent = `₹ ${data.total_paid}`;
+                    document.getElementById('dueAmount').textContent = `₹ ${data.due_amount}`;
+                    document.getElementById('emiAmount').value = data.emi; // Auto-fill EMI
+                    document.getElementById('memberDetails').style.display = 'block';
+
+                    // NEW: Load EMI payments table and set last EMI display
+                    loadEmiPayments(memberId);
+                })
+                .catch(error => alert('Error loading details: ' + error));
+        }
+
+        // NEW: Function to load EMI payments table and set last EMI info
+        function loadEmiPayments(memberId) {
+            fetch(`/get_member_payments/${memberId}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentPayments = data;
+                    const tbody = document.getElementById('emiTableBody');
+                    tbody.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach(payment => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(payment.pay_date).toLocaleDateString('en-IN')}</td>
+                                <td>₹${payment.amount.toFixed(2)}</td>
+                                <td>${payment.payment_mode}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                        document.getElementById('deleteLastEmiBtn').disabled = false;
+                        document.getElementById('exportCsvBtn').disabled = false;
+                        document.getElementById('emiPaymentsSection').style.display = 'block';
+
+                        // Set last EMI display
+                        const lastPayment = data[0]; // First is latest (DESC order)
+                        document.getElementById('lastEmiAmount').textContent = lastPayment.amount.toFixed(2);
+                        document.getElementById('lastEmiDate').textContent = new Date(lastPayment.pay_date).toLocaleDateString('en-IN');
+                        document.getElementById('lastEmiMode').textContent = lastPayment.payment_mode;
+                        document.getElementById('lastEmiDisplay').style.display = 'block';
+                    } else {
+                        document.getElementById('deleteLastEmiBtn').disabled = true;
+                        document.getElementById('exportCsvBtn').disabled = true;
+                        document.getElementById('emiPaymentsSection').style.display = 'none';
+                        document.getElementById('lastEmiDisplay').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    alert('Error loading EMI payments: ' + error);
+                    document.getElementById('emiPaymentsSection').style.display = 'none';
+                    document.getElementById('lastEmiDisplay').style.display = 'none';
+                });
+        }
+
+        // NEW: Function to export EMI history to CSV
+        function exportToCsv() {
+            if (currentPayments.length === 0) return;
+
+            let csvContent = 'data:text/csv;charset=utf-8,';
+            csvContent += 'Date,Amount,Mode\n';
+
+            currentPayments.forEach(payment => {
+                const row = [
+                    new Date(payment.pay_date).toLocaleDateString('en-IN'),
+                    payment.amount.toFixed(2),
+                    payment.payment_mode
+                ];
+                csvContent += row.join(',') + '\n';
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', `emi_history_${currentMemberId}_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // NEW: Function to delete last EMI
+        function deleteLastEmi() {
+            if (currentPayments.length === 0) return;
+
+            const lastPaymentId = currentPayments[0].id; // Assuming first in array is latest (DESC order)
+            if (confirm('Are you sure you want to delete the last paid EMI? This will adjust the loan balance.')) {
+                fetch(`/delete_emi/${lastPaymentId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Last EMI deleted successfully. Loan updated.');
+                            loadEmiPayments(currentMemberId); // Reload table
+                            // Optionally reload member details to update due amount
+                            fetch(`/get_member_details/${currentMemberId}`)
+                                .then(response => response.json())
+                                .then(memberData => {
+                                    if (!memberData.error) {
+                                        document.getElementById('dueAmount').textContent = `₹ ${memberData.due_amount}`;
+                                        document.getElementById('totalPaid').textContent = `₹ ${memberData.total_paid}`;
+                                    }
+                                });
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    })
+                    .catch(error => alert('Delete failed: ' + error));
+            }
+        }
+
+        document.getElementById('emiForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const memberId = document.getElementById('memberSelect').value;
+
+            fetch('/pay_emi', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate receipt
+                    document.getElementById('receiptMemberId').textContent = memberId;
+                    document.getElementById('receiptMemberName').textContent = data.name;
+                    document.getElementById('receiptLoanId').textContent = data.loan_id;
+                    document.getElementById('receiptPayDate').textContent = formData.get('pay_date');
+                    document.getElementById('receiptPaymentMode').textContent = formData.get('payment_mode');
+                    document.getElementById('receiptEmiAmount').textContent = `₹ ${formData.get('emi_amount')}`;
+                    document.getElementById('receiptDueAmount').textContent = `₹ ${data.new_due_amount}`;
+                    
+                    document.getElementById('emiForm').style.display = 'none';
+                    document.getElementById('receipt').style.display = 'block';
+                } else {
+                    alert(data.error);
+                }
+            })
+            .catch(error => alert('Error: ' + error));
+        });
+
+        function sendWhatsApp() {
+            const memberMobile = document.getElementById('memberSelect').selectedOptions[0].dataset.mobile || '7253946012'; // Fallback
+            const message = `Dear ${document.getElementById('receiptMemberName').textContent}, Your EMI of ₹${document.getElementById('receiptEmiAmount').textContent.replace('₹ ', '')} has been received on ${document.getElementById('receiptPayDate').textContent}. Updated Due: ${document.getElementById('receiptDueAmount').textContent}. Thank you! - FINVESTACORE`;
+            const whatsappUrl = `https://wa.me/91${memberMobile}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+    </script>
+</body>
+</html>

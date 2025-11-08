@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Ledger Report - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .header-center p {
+            margin: 5px 0 0 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .back-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 100px auto 20px;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        .form-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #007bff;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .form-group button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+            margin-top: 20px;
+        }
+        .form-group button:hover {
+            background: #0056b3;
+        }
+        #ledgerDetails {
+            display: none;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #007bff;
+        }
+        #ledgerDetails h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        #ledgerDetails p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        #reportTable {
+            display: none;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #f8f9fa;
+        }
+        #reportTable th, #reportTable td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        #reportTable th {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        #reportTable tr:hover {
+            background: #e9ecef;
+        }
+        .debit {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .credit {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .balance {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .print-section {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .print-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.3s;
+        }
+        .print-button:hover {
+            background: #218838;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+            padding: 20px;
+            border-bottom: 2px solid #007bff;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .report-header h3 {
+            margin: 0 0 10px 0;
+            color: #007bff;
+            font-size: 1.5em;
+        }
+        .report-header p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .container, .container * {
+                visibility: visible;
+            }
+            .container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                box-shadow: none;
+                border: none;
+                background: white;
+            }
+            header {
+                display: block !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                background: white !important;
+                color: black !important;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                z-index: 1000;
+                padding: 15px;
+                border-bottom: 2px solid #007bff;
+                text-align: center;
+            }
+            .header-left, .back-button {
+                display: none !important;
+            }
+            .header-center {
+                flex: none !important;
+                text-align: center !important;
+            }
+            .header-center h1 {
+                font-size: 1.6em !important;
+                margin: 0 0 5px 0 !important;
+                color: #007bff !important;
+                font-weight: bold !important;
+                text-shadow: none !important;
+            }
+            .header-center p {
+                font-size: 0.85em !important;
+                margin: 2px 0 !important;
+                color: #333 !important;
+                opacity: 1 !important;
+            }
+            .logo {
+                display: none !important; /* Hide logo in print if path issue */
+            }
+            .form-section, .form-group, .print-section {
+                display: none !important;
+            }
+            #ledgerDetails {
+                display: none !important; /* FIXED: Hide duplicate member info in print */
+            }
+            #reportTable {
+                display: block !important;
+                margin-top: 120px; /* Space for fixed header */
+                font-size: 11px !important;
+                border: 1px solid #000 !important;
+            }
+            #reportTable th, #reportTable td {
+                padding: 8px !important;
+                border: 1px solid #000 !important;
+                text-align: left !important;
+            }
+            #reportTable th {
+                background: #e9ecef !important;
+                color: black !important;
+                font-weight: bold !important;
+                font-size: 10px !important;
+            }
+            .debit, .credit, .balance {
+                color: #000 !important;
+                font-weight: bold !important;
+            }
+            #reportHeader {
+                display: block !important;
+                margin: 20px 0 !important;
+                text-align: center !important;
+                padding: 15px !important;
+                border: 1px solid #ddd !important;
+                background: #f9f9f9 !important;
+                border-radius: 5px !important;
+            }
+            @page {
+                margin: 1.0in;
+                size: A4;
+                @top-center {
+                    content: "FINVESTACORE SMALL CAPITAL PVT LTD";
+                    font-size: 25px;
+                    color: #666;
+                }
+            }
+            /* Avoid page breaks in table */
+            #reportTable { page-break-inside: avoid; }
+        }
+        @media (max-width: 768px) {
+            .container {
+                margin: 100px 10px 20px;
+                padding: 20px;
+            }
+            .form-section {
+                flex-direction: column;
+            }
+            #reportTable {
+                font-size: 14px;
+            }
+            #reportTable th, #reportTable td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='fin.jpg') }}" alt="FINVESTACORE Logo" class="logo">
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012, Email- finvesta.core@gmail.com</p>
+        </div>
+        <a href="/" class="back-button" title="Back to Home">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </header>
+
+    <div class="container">
+        <h2>Member Ledger Report</h2>
+        
+        <form id="ledgerForm">
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="memberSelect">Select Member:</label>
+                    <select id="memberSelect" name="member_id" required onchange="loadMemberInfo()">
+                        <option value="">-- Select Member --</option>
+                        {% for member in active_members %}
+                        <option value="{{ member.member_id }}" data-mobile="{{ member.mobile }}">{{ member.member_id }} - {{ member.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fromDate">From Date:</label>
+                    <input type="date" id="fromDate" name="from_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="toDate">To Date:</label>
+                    <input type="date" id="toDate" name="to_date" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <button type="submit">Generate Ledger</button>
+            </div>
+        </form>
+
+        <!-- Report Header for Print -->
+        <div id="reportHeader" class="report-header">
+            <h3>Member Ledger Report</h3>
+            <p><strong>Member:</strong> <span id="printMember"></span></p>
+            <p><strong>Period:</strong> <span id="printPeriod"></span></p>
+            <p>Generated on: <span id="printDate"></span></p>
+        </div>
+
+        <!-- Print Button Section -->
+        <div id="printSection" class="print-section">
+            <button type="button" id="printBtn" class="print-button">
+                <i class="fas fa-print"></i> Print Report
+            </button>
+        </div>
+
+        <!-- Member Info (Screen only) -->
+        <div id="ledgerDetails">
+            <h3>Ledger for:</h3>
+            <p><strong>Member Name:</strong> <span id="memberName"></span></p>
+            <p><strong>Member ID:</strong> <span id="memberId"></span></p>
+            <p><strong>Mobile:</strong> <span id="memberMobile"></span></p>
+            <p><strong>Period:</strong> <span id="period"></span></p>
+        </div>
+
+        <!-- Ledger Table -->
+        <table id="reportTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Transaction Type</th>
+                    <th>Description</th>
+                    <th>Debit (₹)</th>
+                    <th>Credit (₹)</th>
+                    <th>Balance (₹)</th>
+                </tr>
+            </thead>
+            <tbody id="ledgerBody">
+                <!-- Populated via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Set default dates: 1 year ago to today
+        const today = new Date().toISOString().split('T')[0];
+        const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        document.getElementById('fromDate').value = oneYearAgo;
+        document.getElementById('toDate').value = today;
+
+        let currentMemberName = '';
+        let currentMemberId = '';
+        let currentPeriod = '';
+
+        function loadMemberInfo() {
+            const memberId = document.getElementById('memberSelect').value;
+            if (!memberId) {
+                document.getElementById('ledgerDetails').style.display = 'none';
+                return;
+            }
+
+            // AJAX to fetch basic member info
+            fetch(`/get_member_info/${memberId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    document.getElementById('memberName').textContent = data.name;
+                    document.getElementById('memberId').textContent = data.member_id;
+                    document.getElementById('memberMobile').textContent = data.mobile;
+                    document.getElementById('ledgerDetails').style.display = 'block';
+                    currentMemberName = data.name;
+                    currentMemberId = data.member_id;
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    alert('Error loading info: ' + error.message);
+                });
+        }
+
+        document.getElementById('ledgerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const memberId = document.getElementById('memberSelect').value;
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            if (!memberId || !fromDate || !toDate || new Date(fromDate) > new Date(toDate)) {
+                alert('Please select valid member and dates');
+                return;
+            }
+
+            // Update period
+            const period = `${fromDate} to ${toDate}`;
+            document.getElementById('period').textContent = period;
+            document.getElementById('ledgerDetails').style.display = 'block';
+            currentPeriod = period;
+
+            // Update print header
+            document.getElementById('printMember').textContent = `${currentMemberName} (${currentMemberId})`;
+            document.getElementById('printPeriod').textContent = period;
+            document.getElementById('printDate').textContent = new Date().toLocaleDateString('en-IN');
+
+            // AJAX to fetch ledger data
+            fetch(`/get_member_ledger?member_id=${memberId}&from_date=${fromDate}&to_date=${toDate}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        alert('Report Error: ' + data.error);
+                        return;
+                    }
+                    const tbody = document.getElementById('ledgerBody');
+                    tbody.innerHTML = '';
+                    let runningBalance = 0;
+                    data.forEach(row => {
+                        const isDebit = row.type === 'loan_disbursed' || row.type === 'emi_due';
+                        const amount = parseFloat(row.amount || 0);
+                        runningBalance += isDebit ? amount : -amount;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.date || 'N/A'}</td>
+                            <td>${row.type || 'N/A'}</td>
+                            <td>${row.description || 'N/A'}</td>
+                            <td class="debit">${isDebit ? amount.toLocaleString('en-IN') : ''}</td>
+                            <td class="credit">${!isDebit ? amount.toLocaleString('en-IN') : ''}</td>
+                            <td class="balance">₹ ${Math.abs(runningBalance).toLocaleString('en-IN')} ${runningBalance < 0 ? 'Dr' : 'Cr'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    document.getElementById('reportTable').style.display = 'table';
+                    document.getElementById('reportHeader').style.display = 'block';
+                    document.getElementById('printSection').style.display = 'flex';
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    alert('Error fetching ledger: ' + error.message);
+                });
+        });
+
+        // Print functionality
+        document.getElementById('printBtn').addEventListener('click', function() {
+            window.print();
+        });
+    </script>
+</body>
+</html>

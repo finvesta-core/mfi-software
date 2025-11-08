@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: finvestacore
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python proxy.py & gunicorn app:app
+    envVars:
+      DATABASE_URL:
+        fromDatabase:
+          name: finvestacore-pg
+          property: connectionString

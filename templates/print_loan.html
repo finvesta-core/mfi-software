@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Loan Document - FINVESTACORE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: white; color: #333; line-height: 1.6; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; border: 2px solid #007bff; border-radius: 10px; }
+        .header { text-align: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #ddd; }
+        .header img { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 10px; }
+        .header h1 { color: #007bff; margin: 5px 0; }
+        .header p { margin: 2px 0; color: #666; }
+        .error { color: #dc3545; text-align: center; font-size: 1.1em; margin: 20px 0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: bold; color: #007bff; margin-bottom: 5px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
+        .form-group button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; width: 100%; }
+        .loan-details { margin-top: 20px; }
+        .details-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .details-table th, .details-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .details-table th { background: #f8f9fa; font-weight: bold; color: #007bff; width: 40%; }
+        .details-table tr:nth-child(even) { background: #f8f9fa; }
+        .schedule-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .schedule-table th, .schedule-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .schedule-table th { background: #007bff; color: white; }
+        .schedule-table tr:nth-child(even) { background: #f8f9fa; }
+        .total-section { text-align: center; margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 5px; }
+        .total-section h3 { color: #155724; margin-top: 0; }
+        .terms-section { margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; }
+        .terms-section h2 { color: #007bff; text-align: center; margin-bottom: 20px; }
+        .terms-section h3 { color: #333; margin-top: 20px; }
+        .terms-section p, .terms-section ul { margin-bottom: 15px; }
+        .company-footer { text-align: center; margin: 20px 0; padding: 10px; background: #e9ecef; border-radius: 5px; font-size: 0.9em; }
+        .signature-section { margin-top: 40px; display: flex; justify-content: space-between; border-top: 1px solid #ddd; padding-top: 20px; }
+        .signature { text-align: center; width: 45%; }
+        .signature p { margin: 5px 0; font-style: italic; }
+        @media print { body { padding: 0; } .container { border: none; box-shadow: none; } .form-group { display: none; } .signature { border-bottom: 1px solid #000; padding-bottom: 10px; } }
+        @media (max-width: 768px) { .details-table, .schedule-table { font-size: 0.9em; } .signature-section { flex-direction: column; } .signature { width: 100%; margin-bottom: 20px; } }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="container">
+        <div class="header">
+            <img src="{{ url_for('static', filename='fin.jpg') }}" alt="FINVESTACORE Logo">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+            <p>M.-7253946012 | Email: finvesta.core@gmail.com</p>
+        </div>
+
+        {% if error %}
+        <div class="error">
+            <i class="fas fa-exclamation-triangle"></i> {{ error }}
+        </div>
+        <form method="POST">
+            <div class="form-group">
+                <label for="loan_id">Enter Loan ID:</label>
+                <input type="text" id="loan_id" name="loan_id" placeholder="e.g., PL004" required>
+            </div>
+            <div class="form-group">
+                <button type="submit"><i class="fas fa-search"></i> Fetch & Print</button>
+            </div>
+        </form>
+        {% else %}
+        {% if loan %}
+            <div class="loan-details">
+                <h2>Loan Document for ID: {{ loan.loan_id }}</h2>
+                <p><strong>Generated on:</strong> {{ current_date }}</p>
+                
+                <!-- Loan Details Table (Two Columns) -->
+                <table class="details-table">
+                    <tr>
+                        <th>Member Name</th>
+                        <td>{{ loan.member_name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Father/Spouse Name</th>
+                        <td>{{ loan.father_name or loan.spouse_name or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Address</th>
+                        <td>{{ loan.address or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Loan Type</th>
+                        <td>{{ loan.loan_type }}</td>
+                    </tr>
+                    <tr>
+                        <th>Loan Amount</th>
+                        <td>₹{{ "%.2f"|format(loan.amount) }}</td>
+                    </tr>
+                    <tr>
+                        <th>EMI</th>
+                        <td>₹{{ "%.2f"|format(loan.emi) }} {{ 'per day' if loan.repayment_type == 'daily' else 'per month' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Interest Rate</th>
+                        <td>{{ loan.interest_rate }}% p.a.</td>
+                    </tr>
+                    <tr>
+                        <th>Tenure</th>
+                        <td>{{ loan.tenure_months or 0 }} months / {{ loan.tenure_days or 0 }} days</td>
+                    </tr>
+                    <tr>
+                        <th>Loan Date</th>
+                        <td>{{ loan.loan_date }}</td>
+                    </tr>
+                    <tr>
+                        <th>EMI Start</th>
+                        <td>{{ loan.emi_start_date }}</td>
+                    </tr>
+                    <tr>
+                        <th>EMI End</th>
+                        <td>{{ loan.emi_end_date }}</td>
+                    </tr>
+                    <tr>
+                        <th>Total Due Amount</th>
+                        <td>₹{{ "%.2f"|format(loan.due_amount) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Total Paid So Far</th>
+                        <td>₹{{ "%.2f"|format(loan.total_paid) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Current Due</th>
+                        <td>₹{{ "%.2f"|format(loan.due_amount - loan.total_paid) }}</td>
+                    </tr>
+                    {% if loan.purpose %}
+                    <tr>
+                        <th>Purpose</th>
+                        <td>{{ loan.purpose }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if loan.guarantor_id %}
+                    <tr>
+                        <th>Guarantor ID</th>
+                        <td>{{ loan.guarantor_id }} ({{ loan.guarantor_name or 'N/A' }})</td>
+                    </tr>
+                    {% endif %}
+                </table>
+
+                <!-- Repayment Schedule Table -->
+                <h3>Repayment Schedule</h3>
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Installment #</th>
+                            <th>Date</th>
+                            <th>EMI (₹)</th>
+                            <th>Interest (₹)</th>
+                            <th>Principal (₹)</th>
+                            <th>Balance (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in schedule %}
+                        <tr>
+                            <td>{{ row.installment }}</td>
+                            <td>{{ row.date }}</td>
+                            <td>₹{{ "%.2f"|format(row.emi) }}</td>
+                            <td>₹{{ "%.2f"|format(row.interest) }}</td>
+                            <td>₹{{ "%.2f"|format(row.principal) }}</td>
+                            <td>₹{{ "%.2f"|format(row.balance) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6">No schedule available (check loan details).</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <h3>Total Repayment Summary</h3>
+                    <p><strong>Total EMI Payments:</strong> ₹{{ "%.2f"|format(loan.emi * (loan.tenure_months or loan.tenure_days or 12)) }} ({{ loan.tenure_months or loan.tenure_days or 12 }} installments)</p>
+                    <p><strong>Total Interest:</strong> ₹{{ "%.2f"|format((loan.due_amount or 0) - (loan.amount or 0)) }}</p>
+                    <p><strong>Grand Total Due:</strong> ₹{{ "%.2f"|format(loan.due_amount or 0) }}</p>
+                </div>
+
+                <!-- Terms and Conditions Section -->
+                <div class="terms-section">
+                    <h2>Terms and Conditions</h2>
+                    <p>Dear Sir,</p>
+                    <p text-align: justify;>I/We <strong>{{ loan.member_name }}</strong>, Sio, Dio, {{ 'W/o' if loan.spouse_name else 'D/o' }} <strong>{{ loan.father_name or loan.spouse_name or 'N/A' }}</strong>, Resident of <strong>{{ loan.address or 'N/A' }}</strong> -do hereby solemnly affirm/declare/understand and agree on this as here under.</p>
+                    <p text-align: justify;>The following are the Details of the Loan that we have availed from <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> and according to which all the other related terms and conditions will apply which is as follows:</p>
+                    <p text-align: justify;>The Borrower(s) (which includes his/her heirs, legal representatives, executors administrators & permitted assigns) hereby agrees to abide and be bound by the following terms and conditions ("Terms and Conditions")</p>
+
+                    <h3>GENERAL TERMS AND CONDITIONS</h3>
+                    <p text-align: justify;>These Standard Terms and Conditions of this Loan Agreement between <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> and the Borrower. It is important that you read these terms and conditions carefully and keep them for future reference.</p>
+
+                    <h3>ADVANCEMENT</h3>
+                    <p text-align: justify;>(a) This terms and conditions shall commence on the effective date (written above) and shall continue until the facility is fully liquidated.</p>
+                    <p text-align: justify;>(b) <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> agrees to advance the Loan and the Borrower agrees to take the loan subject to this terms and conditions as set out herein.</p>
+                    <p text-align: justify;>(c) The MICRO Company gives loan to Borrower for the purpose of boosting their business capital/others purpose.</p>
+
+                    <h3>INTEREST RATE AND CHARGES</h3>
+                    <p text-align: justify;>(a) As per selected Scheme.</p>
+                    <p text-align: justify;>(b) The interest rate is subject to review at the Company discretion.</p>
+                    <p text-align: justify;>(c) Any change in interest rate will take effect on the Borrower's account following a minimum of 7 days written notice.</p>
+
+                    <h3>METHOD OF PAYMENT</h3>
+                    <p text-align: justify;>All repayments by the Borrower will be made by one of the following methods: Direct Deposit at <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> Accounts, Cash deposit, Company Post-dated Cheques and Standing Order or through an acceptable electronic channel. All other methods will be accepted with the Companys consent only. The Borrower will be given a dedicated and customized repayment plan together with this offer letter upon approval of the loan application.</p>
+
+                    <h3>LOAN REPAYMENT</h3>
+                    <p text-align: justify;>The Borrower will be given a dedicated and customized repayment plan together with this offer letter upon approval of the loan application. The Borrower is obliged to repay the loan according to the re-payment plan.</p>
+
+                    <h3>ANTICIPATED LOAN REPAYMENT</h3>
+                    <p text-align: justify;>(a) The Borrower agrees to repay the Loan (principal and accrued interest) in accordance with this terms and condition,</p>
+                    <p text-align: justify;>(b) The Borrower may terminate the Loan Agreement and repay back all or any part of the borrowed sum on any day before the scheduled maturity date, by paying to <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong>, all interest, fees and other monies then accrued or due under this Agreement as at the date of early repayment (whether or not yet payable).</p>
+                    <p text-align: justify;>(c) The Borrower hereby agrees that non-payment of the amount owed to by the Payment Due Date shall render the Borrower in default and entitles the <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> to take steps to recover the outstanding loan amount.</p>
+                    <p text-align: justify;>(d) The Borrower hereby agrees to abide by the payment date in his repayment plan as there is no option of change in repayment date.</p>
+
+                    <h3>PENALTIES</h3>
+                    <p text-align: justify;>In case of late payment, penalty rate is as per scheme details ests.</p>
+
+                    <h3>RIGHTS AND OBLIGATION OF THE BORROWER AND THE CO-SIGNATORY</h3>
+                    <p text-align: justify;>(a) The Borrower has the right to receive and use the loan as stipulated in the terms and conditions. (b) The installments must to be paid as and when due by paying in any of the conventional company.</p>
+                    <p text-align: justify;>(c) The Borrower must not use the loan for a different purpose as against the stipulated purpose provided. in the application form.</p>
+
+                    <h3>EVENTS OF DEFAULT</h3>
+                    <p text-align: justify;>a. In case the Borrower has failed to pay as at when due, the Company has the right under the co-signed to debit all accounts of the Borrower with the overdue installment.</p>
+                    <p text-align: justify;>b. The Bank has the right to unilaterally terminate the contract and to demand immediate payment of the entire outstanding loan principal, interest, penalties and other charges accrued the loan.</p>
+
+                    <h3>ASSIGNMENT AND DISCLOSURE OF INFORMATION</h3>
+                    <p text-align: justify;>a. The Borrower consents irrevocably to any future transfer and assignment, however arising of the loan, whether as part of a loan transfer scheme or otherwise.</p>
+                    <p text-align: justify;>b. The Borrower authorizes <strong>FINVESTACORE SMALL CAPITAL PRIVATE LIMITED</strong> to disclose any information or documentation relating to the loan to the general public and will further be flagged on the Credit bureau Agency in event that the Borrower defaults in repaying the said loan.</p>
+                    <p text-align: justify;>c. In the case of individuals, the Borrower authorizes the company to disclose any information or documentation relating to the loan to the general public including but not limited to the borrower's friends, family members and relatives, and any other affiliated organizations or bodies associated with the borrower in the event that the loan has ceased tobe serviced by the Borrower.</p>
+
+                    <h3>Declaration of Borrower</h3>
+                    <p text-align: justify;>I Read the all terms and condition carefully I will follow the all terms and condition.</p>
+
+                    <div class="signature-section">
+                        <div class="signature">
+                            <p><strong>{{ loan.member_name }}</strong></p>
+                            <p>Signature of Borrower</p>
+                        </div>
+                        {% if loan.guarantor_name %}
+                        <div class="signature">
+                            <p><strong>{{ loan.guarantor_name }}</strong></p>
+                            <p>Signature of Guarantor</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div style="text-align: right; margin-top: 20px; font-style: italic;">
+                    <p>Generated on: {{ current_date }}</p>
+                </div>
+            </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    {% if not loan and not error %}
+    <form method="POST">
+        <div class="form-group">
+            <label for="loan_id">Enter Loan ID to Print:</label>
+            <input type="text" id="loan_id" name="loan_id" placeholder="e.g., PL0001" required>
+        </div>
+        <div class="form-group">
+            <button type="submit"><i class="fas fa-print"></i> Fetch & Print Document</button>
+        </div>
+    </form>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Member - FINVESTACORE SMALL CAPITAL PVT LTD</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Same CSS as yours - no change */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #3079ee 100%);
+            color: #333;
+        }
+        header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(7, 2, 2, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(241, 198, 4, 0.2);
+            background-color: #ffc107; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .home-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+        .home-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .header-center h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .header-center p {
+            margin: 5px 0 0 0;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .form-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .form-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .form-table th,
+        .form-table td {
+            padding: 10px;
+            vertical-align: top;
+            border: none;
+        }
+        .form-table th {
+            text-align: left;
+            color: #007bff;
+            font-size: 1.2em;
+            padding-top: 20px;
+            width: 100%;
+        }
+        .form-table td {
+            width: 50%;
+        }
+        .form-group {
+            margin-bottom: 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1em;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        .form-error-msg { 
+            color: #dc3545;
+            font-size: 0.9em;
+            display: none; 
+            margin-top: 5px;
+        }
+        .conditional-field {
+            display: none;
+        }
+        button {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,123,255,0.2);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+            width: 48%; 
+        }
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        button:hover::before {
+            left: 100%;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+        }
+        button:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .cancel-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+        .cancel-btn:hover {
+            background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+        .btn-group {
+            text-align: center;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        h2 {
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .auto-field {
+            background-color: #f8f9fa;
+            font-style: italic;
+        }
+        /* Message Styling */
+        #submissionMessage {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .msg-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .msg-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .msg-info {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+            vertical-align: middle;
+            visibility: hidden; /* Hide by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        
+        @media (max-width: 768px) {
+            .form-container {
+                margin: 20px;
+                padding: 20px;
+            }
+            .form-table th,
+            .form-table td {
+                display: block;
+                width: 100%;
+            }
+            .btn-group {
+                flex-direction: column;
+            }
+            button {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <!-- Placeholder for fin.jpg -->
+            <div class="logo">FIN</div>
+        </div>
+        <div class="header-center">
+            <h1>FINVESTACORE SMALL CAPITAL PVT LTD</h1>
+            <p>Purana Bazar, Budaun 243601, U.P.</p>
+        </div>
+        <a href="/" class="home-button" title="Go Home">
+            <i class="fas fa-home"></i> Home
+        </a>
+    </header>
+    
+    <div class="form-container">
+        <h2>Add New Member</h2>
+
+        <!-- Flash Messages from Flask -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert {{ 'alert-success' if category == 'success' else 'alert-danger' if category == 'error' else 'alert-info' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form id="memberForm" method="POST" action="/add_member">
+            <table class="form-table">
+                <tr>
+                    <th colspan="2">Personal Details</th>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="full_name">Full Name <span style="color: red;">*</span></label>
+                        <input type="text" id="full_name" name="full_name" required placeholder="Enter member's full name" value="{{ form_data.full_name if form_data else '' }}">
+                        <div class="form-error-msg" id="fullNameError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="father_name">Father's Name</label>
+                        <input type="text" id="father_name" name="father_name" placeholder="Enter father's full name" value="{{ form_data.father_name if form_data else '' }}">
+                        <div class="form-error-msg" id="fatherNameError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="gender">Gender <span style="color: red;">*</span></label>
+                        <select id="gender" name="gender" required>
+                            <option value="">Select</option>
+                            <option value="Male" {{ 'selected' if form_data and form_data.gender == 'Male' else '' }}>Male</option>
+                            <option value="Female" {{ 'selected' if form_data and form_data.gender == 'Female' else '' }}>Female</option>
+                            <option value="Other" {{ 'selected' if form_data and form_data.gender == 'Other' else '' }}>Other</option>
+                        </select>
+                        <div class="form-error-msg" id="genderError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="dob">Date of Birth <span style="color: red;">*</span></label>
+                        <input type="date" id="dob" name="dob" required min="1925-01-01" value="{{ form_data.dob if form_data else '' }}">
+                        <div class="form-error-msg" id="dobError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="age">Age</label>
+                        <input type="text" id="age" name="age" readonly class="auto-field" placeholder="Will be auto-filled">
+                    </td>
+                    <td class="form-group">
+                        <label for="marital_status">Marital Status <span style="color: red;">*</span></label>
+                        <select id="marital_status" name="marital_status" required>
+                            <option value="">Select</option>
+                            <option value="Single" {{ 'selected' if form_data and form_data.marital_status == 'Single' else '' }}>Single</option>
+                            <option value="Married" {{ 'selected' if form_data and form_data.marital_status == 'Married' else '' }}>Married</option>
+                        </select>
+                        <div class="form-error-msg" id="maritalStatusError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="education">Education</label>
+                        <select id="education" name="education">
+                            <option value="">Select Education</option>
+                            <option value="Illiterate" {{ 'selected' if form_data and form_data.education == 'Illiterate' else '' }}>Illiterate</option>
+                            <option value="Primary" {{ 'selected' if form_data and form_data.education == 'Primary' else '' }}>Primary</option>
+                            <option value="Secondary" {{ 'selected' if form_data and form_data.education == 'Secondary' else '' }}>Secondary</option>
+                            <option value="Graduate" {{ 'selected' if form_data and form_data.education == 'Graduate' else '' }}>Graduate</option>
+                            <option value="Post-Graduate" {{ 'selected' if form_data and form_data.education == 'Post-Graduate' else '' }}>Post-Graduate</option>
+                            <option value="Other" {{ 'selected' if form_data and form_data.education == 'Other' else '' }}>Other</option>
+                        </select>
+                        <div class="form-error-msg" id="educationError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="occupation">Occupation</label>
+                        <input type="text" id="occupation" name="occupation" placeholder="Enter occupation" value="{{ form_data.occupation if form_data else '' }}">
+                        <div class="form-error-msg" id="occupationError"></div>
+                    </td>
+                </tr>
+                <tr class="conditional-field" id="spouseRow">
+                    <td colspan="2" class="form-group">
+                        <label for="spouse_name">Spouse Name</label>
+                        <input type="text" id="spouse_name" name="spouse_name" placeholder="Enter spouse's full name" value="{{ form_data.spouse_name if form_data else '' }}">
+                        <div class="form-error-msg" id="spouseNameError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="phone_number">Mobile Number <span style="color: red;">*</span></label>
+                        <input type="text" id="phone_number" name="phone_number" required placeholder="10 digit mobile number" pattern="[0-9]{10}" title="Enter 10 digit number" value="{{ form_data.phone_number if form_data else '' }}">
+                        <div class="form-error-msg" id="phoneError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="pincode">Pincode <span style="color: red;">*</span></label>
+                        <input type="text" id="pincode" name="pincode" required placeholder="6 digit pincode" pattern="[0-9]{6}" title="Enter 6 digit pincode" value="{{ form_data.pincode if form_data else '' }}">
+                        <div class="form-error-msg" id="pincodeError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="form-group">
+                        <label for="address">Address <span style="color: red;">*</span></label>
+                        <textarea id="address" name="address" rows="3" required placeholder="Enter member's full address">{{ form_data.address if form_data else '' }}</textarea>
+                        <div class="form-error-msg" id="addressError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="district">District <span style="color: red;">*</span></label>
+                        <input type="text" id="district" name="district" required placeholder="Enter district" value="{{ form_data.district if form_data else '' }}">
+                        <div class="form-error-msg" id="districtError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="state">State <span style="color: red;">*</span></label>
+                        <input type="text" id="state" name="state" required placeholder="Enter state" value="{{ form_data.state if form_data else '' }}">
+                        <div class="form-error-msg" id="stateError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2">Nominee Details</th>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="nominee_name">Nominee Name <span style="color: red;">*</span></label>
+                        <input type="text" id="nominee_name" name="nominee_name" required placeholder="Enter nominee's full name" value="{{ form_data.nominee_name if form_data else '' }}">
+                        <div class="form-error-msg" id="nomineeNameError"></div>
+                    </td>
+                    <td class="form-group">
+                        <!-- Removed Nominee DOB as per request -->
+                        <label for="nominee_relation">Nominee Relation <span style="color: red;">*</span></label>
+                        <select id="nominee_relation" name="nominee_relation" required>
+                            <option value="">Select Relation</option>
+                            <option value="Spouse" {{ 'selected' if form_data and form_data.nominee_relation == 'Spouse' else '' }}>Spouse</option>
+                            <option value="Child" {{ 'selected' if form_data and form_data.nominee_relation == 'Child' else '' }}>Child</option>
+                            <option value="Parent" {{ 'selected' if form_data and form_data.nominee_relation == 'Parent' else '' }}>Parent</option>
+                            <option value="Sibling" {{ 'selected' if form_data and form_data.nominee_relation == 'Sibling' else '' }}>Sibling</option>
+                            <option value="Other" {{ 'selected' if form_data and form_data.nominee_relation == 'Other' else '' }}>Other</option>
+                        </select>
+                        <div class="form-error-msg" id="nomineeRelationError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2">KYC Details</th>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="aadhaar">Aadhaar Number</label>
+                        <input type="text" id="aadhaar" name="aadhaar" placeholder="12 digit aadhaar number" pattern="[0-9]{12}" title="Enter 12 digit aadhaar number" value="{{ form_data.aadhaar if form_data else '' }}">
+                        <div class="form-error-msg" id="aadhaarError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="pan">PAN Number</label>
+                        <input type="text" id="pan" name="pan" placeholder="PAN number (e.g., ABCDE1234F)" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}" title="Enter valid PAN format" maxlength="10" value="{{ form_data.pan if form_data else '' }}">
+                        <div class="form-error-msg" id="panError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2">Bank Details</th>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="ifsc">IFSC Code <span style="color: red;">*</span></label>
+                        <input type="text" id="ifsc" name="ifsc" required placeholder="IFSC code (e.g., SBIN0000001)" pattern="[A-Za-z]{4}0[A-Za-z0-9]{6}" title="Enter valid IFSC code" value="{{ form_data.ifsc if form_data else '' }}">
+                        <div class="form-error-msg" id="ifscError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="account_number">Account Number <span style="color: red;">*</span></label>
+                        <input type="text" id="account_number" name="account_number" required placeholder="Enter account number" value="{{ form_data.account_number if form_data else '' }}">
+                        <div class="form-error-msg" id="accountError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="form-group">
+                        <label for="bank_branch">Bank/Branch Name <span style="color: red;">*</span></label>
+                        <input type="text" id="bank_branch" name="bank_branch" required placeholder="Enter bank and branch name" value="{{ form_data.bank_branch if form_data else '' }}">
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="form-group">
+                        <label for="bank_address">Bank Address</label>
+                        <textarea id="bank_address" name="bank_address" rows="2" placeholder="Enter bank address">{{ form_data.bank_address if form_data else '' }}</textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2">Guarantor Details</th>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="guarantor_name">Guarantor Name</label>
+                        <input type="text" id="guarantor_name" name="guarantor_name" placeholder="Enter guarantor's full name" value="{{ form_data.guarantor_name if form_data else '' }}">
+                        <div class="form-error-msg" id="guarantorNameError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="guarantor_mobile">Guarantor Mobile Number</label>
+                        <input type="text" id="guarantor_mobile" name="guarantor_mobile" placeholder="10 digit mobile number" pattern="[0-9]{10}" title="Enter 10 digit number" value="{{ form_data.guarantor_mobile if form_data else '' }}">
+                        <div class="form-error-msg" id="guarantorMobileError"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="form-group">
+                        <label for="guarantor_relation">Guarantor Relation <span style="color: red;">*</span></label>
+                        <select id="guarantor_relation" name="guarantor_relation" required>
+                            <option value="">Select Relation</option>
+                            <option value="Friend" {{ 'selected' if form_data and form_data.guarantor_relation == 'Friend' else '' }}>Friend</option>
+                            <option value="Relative" {{ 'selected' if form_data and form_data.guarantor_relation == 'Relative' else '' }}>Relative</option>
+                            <option value="Colleague" {{ 'selected' if form_data and form_data.guarantor_relation == 'Colleague' else '' }}>Colleague</option>
+                            <option value="Other" {{ 'selected' if form_data and form_data.guarantor_relation == 'Other' else '' }}>Other</option>
+                        </select>
+                        <div class="form-error-msg" id="guarantorRelationError"></div>
+                    </td>
+                    <td class="form-group">
+                        <label for="guarantor_address">Guarantor Address</label>
+                        <textarea id="guarantor_address" name="guarantor_address" rows="3" placeholder="Enter guarantor's full address">{{ form_data.guarantor_address if form_data else '' }}</textarea>
+                        <div class="form-error-msg" id="guarantorAddressError"></div>
+                    </td>
+                </tr>
+            </table>
+            <div class="btn-group">
+                <button type="submit" id="submitBtn">
+                    <i class="fas fa-save"></i> Add Member
+                    <div id="submitLoader" class="loader"></div>
+                </button>
+                <button type="button" class="cancel-btn" onclick="window.location.href='/'">
+                    <i class="fas fa-times-circle"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Utility to show messages (for auto-fill feedback)
+        function showMessage(message, type = 'info') {
+            const msgDiv = document.getElementById('submissionMessage');
+            if (!msgDiv) return; // Only if exists
+            msgDiv.textContent = message;
+            msgDiv.className = `msg-${type}`;
+            msgDiv.style.display = 'block';
+            setTimeout(() => { msgDiv.style.opacity = 1; }, 10);
+            if (type === 'success' or type === 'info') 
+            {
+                setTimeout(() => 
+                {
+                    msgDiv.style.opacity = 0;
+                    setTimeout(() => { msgDiv.style.display = 'none'; }, 500);
+                }, 3000);
+            }
+        }
+
+        // --- FORM VALIDATION ON SUBMIT ---
+        document.getElementById('memberForm').addEventListener('submit', function(e) {
+            // Basic client-side validation (backend also validates)
+            let isValid = true;
+            document.querySelectorAll('.form-error-msg').forEach(el => el.style.display = 'none');
+
+            // Check required fields and patterns
+            const requiredFields = ['full_name', 'phone_number', 'pincode', 'address', 'district', 'state', 'ifsc', 'account_number', 'bank_branch', 'nominee_name', 'nominee_relation', 'guarantor_relation'];
+            requiredFields.forEach(field => {
+                const input = document.getElementById(field);
+                if (input && input.required && !input.value.trim()) {
+                    const errorDiv = document.getElementById(`${field}Error`) || document.getElementById(`${field.slice(0, -8)}Error`); // Flexible
+                    if (errorDiv) {
+                        errorDiv.textContent = 'This field is required.';
+                        errorDiv.style.display = 'block';
+                        isValid = false;
+                    }
+                } else if (input && !input.checkValidity()) {
+                    const errorDiv = document.getElementById(`${field}Error`);
+                    if (errorDiv) {
+                        errorDiv.textContent = input.title || 'Invalid format.';
+                        errorDiv.style.display = 'block';
+                        isValid = false;
+                    }
+                }
+            });
+
+            // Custom: Spouse if married
+            const maritalStatus = document.getElementById('marital_status').value;
+            const spouseName = document.getElementById('spouse_name').value.trim();
+            if (maritalStatus === 'Married' && !spouseName) {
+                document.getElementById('spouseNameError').textContent = 'Spouse name is required for married status.';
+                document.getElementById('spouseNameError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                showMessage("Please correct the errors before submitting.", 'error');
+            } else {
+                // Show loading
+                const submitBtn = document.getElementById('submitBtn');
+                const loader = document.getElementById('submitLoader');
+                submitBtn.disabled = true;
+                loader.style.visibility = 'visible';
+                submitBtn.innerHTML = `<i class="fas fa-sync-alt fa-spin"></i> Saving...`;
+            }
+        });
+
+        // --- DOM MANIPULATION FUNCTIONS ---
+
+        function calculateAge() {
+            const dobInput = document.getElementById('dob');
+            const ageInput = document.getElementById('age');
+            const dob = new Date(dobInput.value);
+            
+            if (!dobInput.value) {
+                ageInput.value = '';
+                return;
+            }
+
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                age--;
+            }
+            ageInput.value = age >= 0 ? age + ' years' : 'Invalid Date';
+        }
+
+        function toggleSpouseField() {
+            const maritalStatus = document.getElementById('marital_status').value;
+            const spouseRow = document.getElementById('spouseRow');
+            const spouseInput = document.getElementById('spouse_name');
+            if (maritalStatus === 'Married') {
+                spouseRow.style.display = 'table-row';
+                spouseInput.required = true;
+            } else {
+                spouseRow.style.display = 'none';
+                spouseInput.required = false;
+                spouseInput.value = '';
+                document.getElementById('spouseNameError').style.display = 'none';
+            }
+        }
+
+        // --- DOM INITIALIZATION AND EVENT ATTACHMENT ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dob').setAttribute('max', today);
+            
+            // Initial run
+            calculateAge(); 
+            toggleSpouseField(); 
+
+            // Event listeners
+            document.getElementById('dob').addEventListener('change', calculateAge);
+            document.getElementById('marital_status').addEventListener('change', toggleSpouseField);
+        });
+    </script>
+</body>
+</html>
