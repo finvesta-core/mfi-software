@@ -176,7 +176,7 @@
                         {% for entry in ledger_data %}
                         <tr class="{% if entry.amount < 0 %}table-danger{% else %}table-success{% endif %}">
                             <td>{{ entry.date }}</td>
-                            <td><span class="badge bg-{{ 'danger' if entry.amount < 0 else 'success' }}">{{ entry.type.title() }}</span></td>
+                            <td><span class="badge bg-{{ 'danger' if entry.amount < 0 else 'success' }}">{{ entry.type.replace('_', ' ').title() }}</span></td>
                             <td>{{ entry.description }}</td>
                             <td class="fw-bold">{{ entry.amount if entry.amount > 0 else '-' + entry.amount|string|replace('-', '') }}</td>
                         </tr>

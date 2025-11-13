@@ -14,7 +14,7 @@ app.secret_key = 'your_super_secret_key_for_finvestacore_app'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # SQLite DB setup
-DB_PATH = 'http://localhost:5433'
+DB_PATH = 'finvestacore.db'
 LOCK = threading.Lock()  # For thread-safe 
 
 def get_db_connection():
@@ -565,41 +565,67 @@ def get_member_info(member_id):
         return {'error': f'Database error: {str(e)}'}
 
 
-def fetch_member_ledger_data(member_id, from_date_str, to_date_str):  # Renamed!
-    """Fetch member's ledger transactions between dates"""
+def fetch_member_ledger_data(member_id, from_date_str, to_date_str):
+    """Fetch member's ledger transactions between dates - FIXED NO DUPLICATES"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # FIXED: Use calculated total_repayable for loan_disbursed instead of l.amount
+
             cursor.execute("""
-                SELECT l.loan_date as date, 'loan_disbursed' as type, 'Loan Sanctioned - Total Repayable' as description,
-                       CASE 
-                         WHEN l.repayment_type = 'monthly' THEN l.emi * COALESCE(l.tenure_months, 0)
-                         WHEN l.repayment_type = 'daily' THEN l.emi * COALESCE(l.tenure_days, 120)
-                         ELSE l.amount  -- Fallback to principal if no tenure
-                       END as amount
+                -- 1. Loan Disbursed Entry
+                SELECT 
+                    l.loan_date as date, 
+                    'loan_disbursed' as type, 
+                    'Loan Sanctioned - Total Repayable' as description,
+                    CASE 
+                        WHEN l.repayment_type = 'monthly' THEN l.emi * COALESCE(l.tenure_months, 0)
+                        WHEN l.repayment_type = 'daily' THEN l.emi * COALESCE(l.tenure_days, 120)
+                        ELSE l.amount
+                    END as amount
                 FROM loans l
                 WHERE l.member_id = ? AND l.loan_date BETWEEN ? AND ?
+
                 UNION ALL
-                SELECT t.pay_date, 'emi_paid' as type, 'EMI Payment' as description, t.amount as amount
-                FROM transactions t JOIN loans l ON t.loan_id = l.loan_id
-                WHERE l.member_id = ? AND t.type = 'emi' AND t.pay_date BETWEEN ? AND ?
-                UNION ALL
-                SELECT t.pay_date, 'advance_paid' as type, 'Advance Payment' as description, t.amount as amount
-                FROM transactions t JOIN loans l ON t.loan_id = l.loan_id
-                WHERE l.member_id = ? AND t.type = 'advance' AND t.pay_date BETWEEN ? AND ?
-                ORDER BY date
-            """, (member_id, from_date_str, to_date_str,
-                  member_id, from_date_str, to_date_str,
-                  member_id, from_date_str, to_date_str))
+
+                -- 2. All Payments (EMI + Advance) - Combined & Clean
+                SELECT 
+                    t.pay_date as date,
+                    CASE 
+                        WHEN t.type = 'emi' THEN 'emi_paid'
+                        WHEN t.type = 'advance' THEN 'advance_paid'
+                        ELSE 'other_payment'
+                    END as type,
+                    CASE 
+                        WHEN t.type = 'emi' THEN 'EMI Payment'
+                        WHEN t.type = 'advance' THEN 'Advance Payment'
+                        ELSE 'Other Payment'
+                    END as description,
+                    t.amount as amount
+                FROM transactions t 
+                JOIN loans l ON t.loan_id = l.loan_id
+                WHERE l.member_id = ? 
+                  AND t.type IN ('emi', 'advance')  -- Only these two
+                  AND t.pay_date BETWEEN ? AND ?
+
+                ORDER BY date ASC
+            """, (
+                member_id, from_date_str, to_date_str,
+                member_id, from_date_str, to_date_str
+            ))
+
             rows = cursor.fetchall()
            
             ledger_data = []
             for row in rows:
+                amount = row[3] or 0
                 ledger_data.append({
-                    'date': row[0], 'type': row[1], 'description': row[2], 'amount': row[3]
+                    'date': row[0],
+                    'type': row[1],
+                    'description': row[2],
+                    'amount': float(amount) if amount > 0 else -abs(float(amount))  # Negative for disbursed if needed
                 })
             return ledger_data
+
     except Exception as e:
         raise ValueError(f"Ledger fetch error: {str(e)}")
 
