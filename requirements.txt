@@ -1,3 +1,2 @@
 Flask==2.3.3
 gunicorn==22.0.0
-pgsqlite==0.3.0
