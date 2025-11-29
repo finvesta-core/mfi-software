@@ -847,14 +847,93 @@ def add_penalty_to_loan(loan_id, penalty_amount, penalty_date, description, paym
         
 # --- Flask Routes ---
 
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+# ... (baaki imports same rahenge)
+
+# Root route ko redirect to login kar do
 @app.route('/')
-def index():
-    """Renders the Home page."""
+def home():
+    return redirect(url_for('login'))
+
+# Login route - GET: show form, POST: authenticate & redirect
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user_type = request.form.get('userType')
+        password = request.form.get('password')
+        
+        # Demo auth (prod mein DB se check karo, e.g., users table)
+        if user_type == 'admin' and password == 'admin123':
+            session['logged_in'] = True
+            session['user_type'] = user_type
+            flash('Login successful! Redirecting to dashboard...', 'success')
+            return redirect(url_for('dashboard'))  # /index.html pe jaayega
+        else:
+            flash('Invalid credentials. Try again.', 'error')
+    
+    # GET: Show login if not logged in
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'))
+    
+    # Member count for login page (optional)
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM members')
         member_count = cursor.fetchone()[0]
-    return render_template('index.html', member_count=member_count)
+    
+    return render_template('login.html', member_count=member_count)
+
+# Dashboard route (index.html)
+@app.route('/index.html')
+def dashboard():
+    if not session.get('logged_in'):
+        flash('Please log in to access the dashboard.', 'error')
+        return redirect(url_for('login'))
+    
+    # Dashboard data fetch (fix queries as per your DB)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM members')
+        member_count = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COALESCE(SUM(amount), 0) FROM loans WHERE status = "Active"')
+        active_loans = cursor.fetchone()[0] or 0
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute('SELECT COALESCE(SUM(amount), 0) FROM payments WHERE type="emi" AND pay_date = ?', (today,))
+        todays_collection = cursor.fetchone()[0] or 0
+        
+        # Simple monthly growth
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN prev.count > 0 THEN (curr.count - prev.count) * 100.0 / prev.count 
+                    ELSE 0 
+                END as growth_pct
+            FROM (
+                SELECT COUNT(*) as count FROM members 
+                WHERE strftime('%Y-%m', date_joined) = strftime('%Y-%m', date('now'))
+            ) curr
+            LEFT JOIN (
+                SELECT COUNT(*) as count FROM members 
+                WHERE strftime('%Y-%m', date_joined) = strftime('%Y-%m', date('now', '-1 month'))
+            ) prev
+        """)
+        result = cursor.fetchone()
+        monthly_growth = result[0] if result and result[0] is not None else 0
+    
+    return render_template('index.html',
+                          member_count=member_count,
+                          active_loans=active_loans,
+                          todays_collection=todays_collection,
+                          monthly_growth=monthly_growth)
+
+# Logout route
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully.', 'info')
+    return redirect(url_for('login'))
 
 from datetime import datetime, timedelta
 yesterday = (datetime.now() - timedelta(days=1)).strftime('%d/%m/%Y')
