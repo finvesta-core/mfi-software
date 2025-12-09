@@ -121,7 +121,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-md-2 mb-3">
                     <div class="card h-100 border-0 shadow-sm">
                         <div class="card-body">
                             <i class="fas fa-receipt fa-2x text-info mb-2"></i>
@@ -154,6 +154,15 @@
                             <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
                             <h5 class="card-title">Remaining</h5>
                             <p class="card-text fw-bold">{{ remaining }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-1 mb-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <i class="fas fa-clock fa-2x text-secondary mb-2"></i>
+                            <h5 class="card-title">Pending EMIs</h5>
+                            <p class="card-text fw-bold" style="color: {% if pending_emis_count > 0 %}#dc3545{% else %}#28a745{% endif %};">{{ pending_emis_count }}</p>
                         </div>
                     </div>
                 </div>
