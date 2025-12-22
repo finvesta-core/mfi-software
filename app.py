@@ -1340,14 +1340,20 @@ def loan_list():
     loans_list = []
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        # FIXED: Show all loans, but you can filter by status if needed (e.g., WHERE status != 'Closed' for active only)
-        cursor.execute('SELECT * FROM loans ORDER BY loan_id DESC')
+        # Updated query: Join with members to fetch member_name, and removed emi_start_date from SELECT
+        cursor.execute("""
+            SELECT l.loan_id, l.member_id, l.loan_type, l.amount, l.emi, l.due_amount, l.status, 
+                   l.loan_date, l.emi_start_date, l.loan_closed_date, l.total_paid,  -- Keep other fields as needed
+                   m.full_name as member_name
+            FROM loans l
+            JOIN members m ON l.member_id = m.id
+            ORDER BY l.loan_id DESC
+        """)
         rows = cursor.fetchall()
         for row in rows:
             loans_list.append(dict(row))
-    # NOTE: In loan_list.html, add edit link: <a href="{{ url_for('edit_loan', loan_id=loan.loan_id) }}">Edit</a>
-    # And show status to see if closed
     return render_template('loan_list.html', loans=loans_list)
+
 @app.route('/get_member_details/<member_id>', methods=['GET'])
 def get_member_details(member_id):
     """Fetch member loan details for EMI payment form."""
@@ -2432,71 +2438,85 @@ def print_noc(loan_id):
     return render_template('print_noc.html', loan=loan, current_date=current_date)
 # In app.py, update the borrower_status route as follows:
 
+import re  # Already there, but confirm
+
 @app.route('/borrower_status', methods=['GET', 'POST'])
 def borrower_status():
     if request.method == 'GET':
         return render_template('borrower_status.html')
-  
+
     search_type = request.form.get('search_type')
     search_value = request.form.get('search_value').strip()
-  
+
     if not search_value:
         flash('Loan ID or Mobile No required!', 'error')
         return render_template('borrower_status.html')
-  
+
     result = None
     ledger_data = []
-    pending_emis_count = 0  # Initialize here
-  
+    pending_emis_count = 0
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if search_type == 'loan_id':
-            try:
-                # Parse loan_id (handle PLXXXX or plain number)
-                if search_value.upper().startswith('PL'):
-                    loan_num = int(search_value[2:])
-                else:
-                    loan_num = int(search_value)
-                cursor.execute("""
-                    SELECT l.loan_id, m.full_name as name, l.amount as loan_amount, l.total_paid, l.due_amount as remaining,
-                           l.loan_date, l.status, l.emi  -- ADDED: l.emi for pending count
-                    FROM loans l JOIN members m ON l.member_id = m.id
-                    WHERE l.loan_id = ? AND l.status = 'Active'
-                """, (search_value,))  # Use full PLXXXX string for exact match
-                result = cursor.fetchone()
-            except ValueError:
-                flash('Invalid Loan ID format! Use PLXXXX or number.', 'error')
-                return render_template('borrower_status.html')
-          
+            # FIXED: Normalize loan_id - add 'PL' prefix if missing, zfill to 4 digits
+            search_value_upper = search_value.upper().strip()
+            if not search_value_upper.startswith('PL'):
+                # Assume it's the number part, prepend PL and zfill(4)
+                try:
+                    num_part = re.sub(r'[^\d]', '', search_value)  # Extract digits only
+                    if num_part:
+                        search_value_normalized = f"PL{int(num_part):04d}"
+                    else:
+                        raise ValueError("No digits in Loan ID")
+                except ValueError:
+                    flash('Invalid Loan ID! Use PLXXXX (e.g., PL0001) or just XXXX (e.g., 0001).', 'error')
+                    return render_template('borrower_status.html')
+            else:
+                search_value_normalized = search_value_upper
+
+            cursor.execute("""
+                SELECT l.loan_id, m.full_name as name, l.amount as loan_amount, l.total_paid, l.due_amount as remaining,
+                       l.loan_date, l.status, l.emi
+                FROM loans l JOIN members m ON l.member_id = m.id
+                WHERE l.loan_id = ? AND l.status = 'Active'
+            """, (search_value_normalized,))
+            result = cursor.fetchone()
+
             if result:
                 loan_id = result['loan_id']
-                # Calculate pending EMIs: due / emi (rounded up if partial)
+                # Calculate pending EMIs
                 pending_emis_count = math.ceil(result['remaining'] / result['emi']) if result['emi'] and result['remaining'] > 0 else 0
-                # Ledger query (unchanged)
+                # Ledger query
                 cursor.execute("""
                     SELECT pay_date as date, type, description, amount
                     FROM (
                         SELECT l.loan_date as pay_date, 'loan_disbursed' as type, 'Loan Sanctioned' as description, -l.amount as amount FROM loans l WHERE l.loan_id = ?
                         UNION ALL
-                        SELECT t.pay_date, t.type, 'EMI Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ?
+                        SELECT t.pay_date, t.type, 'EMI Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ? AND t.type = 'emi'
                         UNION ALL
-                        SELECT t.pay_date, t.type, 'Advance Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ?
+                        SELECT t.pay_date, t.type, 'Advance Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ? AND t.type = 'advance'
                     ) ledger ORDER BY pay_date
                 """, (loan_id, loan_id, loan_id))
                 ledger_data = [dict(row) for row in cursor.fetchall()]
-      
+
         elif search_type == 'mobile_no':
+            # FIXED: Clean mobile - remove non-digits (e.g., +91, spaces)
+            search_value_clean = re.sub(r'[^\d]', '', search_value)
+            if len(search_value_clean) < 10:
+                flash('Invalid Mobile No! Enter 10-digit number (e.g., 9876543210).', 'error')
+                return render_template('borrower_status.html')
+
             cursor.execute("""
                 SELECT m.full_name as name, l.loan_id, l.amount as loan_amount, l.total_paid, l.due_amount as remaining,
-                       l.loan_date, l.status, l.emi  -- ADDED: l.emi
+                       l.loan_date, l.status, l.emi
                 FROM members m LEFT JOIN loans l ON m.id = l.member_id
                 WHERE m.phone_number = ? AND l.status = 'Active'
-            """, (search_value,))
+            """, (search_value_clean,))
             result = cursor.fetchone()
-          
+
             if result:
                 loan_id = result['loan_id']
-                # Calculate pending EMIs (same as above)
                 pending_emis_count = math.ceil(result['remaining'] / result['emi']) if result['emi'] and result['remaining'] > 0 else 0
                 # Ledger same as above
                 cursor.execute("""
@@ -2504,30 +2524,29 @@ def borrower_status():
                     FROM (
                         SELECT l.loan_date as pay_date, 'loan_disbursed' as type, 'Loan Sanctioned' as description, -l.amount as amount FROM loans l WHERE l.loan_id = ?
                         UNION ALL
-                        SELECT t.pay_date, t.type, 'EMI Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ?
+                        SELECT t.pay_date, t.type, 'EMI Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ? AND t.type = 'emi'
                         UNION ALL
-                        SELECT t.pay_date, t.type, 'Advance Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ?
+                        SELECT t.pay_date, t.type, 'Advance Payment' as description, t.amount FROM transactions t WHERE t.loan_id = ? AND t.type = 'advance'
                     ) ledger ORDER BY pay_date
                 """, (loan_id, loan_id, loan_id))
                 ledger_data = [dict(row) for row in cursor.fetchall()]
-      
+
         else:
             flash('Select Loan ID or Mobile No!', 'error')
             return render_template('borrower_status.html')
-  
+
     if not result:
-        flash('No active loan found for this Loan ID or Mobile No!', 'error')
+        flash('No active loan found! Check ID/Mobile or loan might be closed.', 'error')
         return render_template('borrower_status.html')
-  
-    # Format currency (unchanged)
-    loan_amount = f"₹{result['loan_amount']:,.2f}"
-    paid = f"₹{result['total_paid']:,.2f}"
-    remaining = f"₹{result['remaining']:,.2f}"
-  
-    # Pass pending_emis_count to template
+
+    # Format currency
+    loan_amount = f"₹{result['loan_amount'] or 0:,.2f}"
+    paid = f"₹{result['total_paid'] or 0:,.2f}"
+    remaining = f"₹{result['remaining'] or 0:,.2f}"
+
     return render_template('borrower_status.html', result=result, ledger_data=ledger_data,
                            loan_amount=loan_amount, paid=paid, remaining=remaining,
-                           pending_emis_count=pending_emis_count)  # ADDED THIS LINE
+                           pending_emis_count=pending_emis_count)
 
 @app.route('/reports/<path:subpath>')
 @app.route('/company/<path:subpath>')
