@@ -2025,31 +2025,38 @@ def print_loan():
                         guarantor = cursor.fetchone()
                         loan['guarantor_name'] = guarantor[0] if guarantor else 'N/A'
                
-                # Compute repayment schedule (same as before)
-                if loan['emi_start_date']:
-                    balance = loan['amount'] or 0
-                    start_date = datetime.strptime(loan['emi_start_date'], '%Y-%m-%d')
-                    num_installments = loan['tenure_months'] if loan['repayment_type'] == 'monthly' else (loan['tenure_days'] or 120)
-                    monthly_rate = (loan['interest_rate'] or 0) / 100 / 12 if loan['repayment_type'] == 'monthly' else 0
-                   
-                    for i in range(1, num_installments + 1):
-                        days_offset = 30 * (i - 1) if loan['repayment_type'] == 'monthly' else (i - 1)
-                        installment_date = start_date + timedelta(days=days_offset)
-                        interest = balance * monthly_rate
-                        principal = loan['emi'] - interest
-                        balance -= principal
-                        if balance < 0:
-                            balance = 0
-                        schedule.append({
-                            'installment': i,
-                            'date': installment_date.strftime('%Y-%m-%d'),
-                            'emi': round(loan['emi'], 2),
-                            'interest': round(interest, 2),
-                            'principal': round(principal, 2),
-                            'balance': round(balance, 2)
-                        })
-   
+                    # Compute repayment schedule (existing code)
+                    if loan['emi_start_date']:
+                        balance = loan['amount'] or 0  # Principal balance for amortization
+                        total_due = loan['due_amount'] or (loan['emi'] * num_installments)  # Total payable
+                        start_date = datetime.strptime(loan['emi_start_date'], '%Y-%m-%d')
+                        num_installments = loan['tenure_months'] if loan['repayment_type'] == 'monthly' else (loan['tenure_days'] or 120)
+                        monthly_rate = (loan['interest_rate'] or 0) / 100 / 12 if loan['repayment_type'] == 'monthly' else 0
+
+                        for i in range(1, num_installments + 1):
+                            days_offset = 30 * (i - 1) if loan['repayment_type'] == 'monthly' else (i - 1)
+                            installment_date = start_date + timedelta(days=days_offset)
+                            interest = balance * monthly_rate
+                            principal = loan['emi'] - interest
+                            balance -= principal
+                            if balance < 0:
+                                balance = 0
+                            
+                            # NEW: Remaining Due after this installment: total_due - (i * emi)
+                            remaining_due = round(total_due - (i * loan['emi']), 2)
+                            if remaining_due < 0:
+                                remaining_due = 0
+                            
+                            schedule.append({
+                                'installment': i,
+                                'date': installment_date.strftime('%Y-%m-%d'),
+                                'emi': round(loan['emi'], 2),
+                                'interest': round(interest, 2),
+                                'principal': round(principal, 2),
+                                'remaining_due': remaining_due  # NEW: Use this in template
+                            })   
     return render_template('print_loan.html', loan=loan, error=error, current_date=current_date, schedule=schedule)
+
 @app.route('/get_loan_details/<loan_id>')
 def get_loan_details_route(loan_id):
     loan = get_loan_by_id(loan_id)
