@@ -295,6 +295,23 @@
             gap: 10px;
             margin-top: 10px;
         }
+        /* NEW: Centered Paid EMI Box */
+        .paid-emi-box {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #155724;
+        }
+        .paid-emi-box i {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -330,6 +347,7 @@
                 <h3>Member Details</h3>
                 <p><strong>Member Name:</strong> <span id="memberName"></span></p>
                 <p><strong>Father's Name:</strong> <span id="fatherName"></span></p>
+                <p><strong>Loan ID:</strong> <span id="loanId"></span></p> <!-- NEW: Loan ID Display -->
                 <p><strong>Loan Amount:</strong> <span id="loanAmount"></span></p>
                 <p><strong>Loan Date:</strong> <span id="loanDate"></span></p>
                 <p><strong>Total Paid:</strong> <span id="totalPaid"></span></p>
@@ -396,6 +414,14 @@
             <h2>EMI Payment Receipt</h2>
             <p><strong>CIN:</strong> U64820UP2024PTC209483</p>
             
+            <!-- NEW: Centered Paid EMI Box in Middle -->
+            <div class="paid-emi-box">
+                <i class="fas fa-check-circle"></i>
+                <div>EMI Paid Successfully!</div>
+                <div>₹ <span id="receiptEmiAmount"></span></div>
+                <div>on <span id="receiptPayDate"></span></div>
+            </div>
+            
             <div class="receipt-body">  <!-- TWO COLUMNS -->
                 <div class="column">
                     <h3>Member & Loan Info</h3>
@@ -404,10 +430,8 @@
                     <p><strong>Loan ID:</strong> <span id="receiptLoanId"></span></p>
                 </div>
                 <div class="column">
-                    <h3>Payment Info</h3>
-                    <p><strong>Pay Date:</strong> <span id="receiptPayDate"></span></p>
+                    <h3>Payment Details</h3>
                     <p><strong>Payment Mode:</strong> <span id="receiptPaymentMode"></span></p>
-                    <p><strong>EMI Amount Paid:</strong> <span id="receiptEmiAmount"></span></p>
                     <p><strong>Updated Due Amount:</strong> <span id="receiptDueAmount"></span></p>
                 </div>
             </div>
@@ -452,6 +476,7 @@
                     }
                     document.getElementById('memberName').textContent = data.name;
                     document.getElementById('fatherName').textContent = data.father_name;
+                    document.getElementById('loanId').textContent = data.loan_id; // NEW: Set Loan ID
                     document.getElementById('loanAmount').textContent = `₹ ${data.loan_amount}`;
                     document.getElementById('loanDate').textContent = data.loan_date;
                     document.getElementById('totalPaid').textContent = `₹ ${data.total_paid}`;
@@ -579,8 +604,8 @@
                     document.getElementById('receiptLoanId').textContent = data.loan_id;
                     document.getElementById('receiptPayDate').textContent = formData.get('pay_date');
                     document.getElementById('receiptPaymentMode').textContent = formData.get('payment_mode');
-                    document.getElementById('receiptEmiAmount').textContent = `₹ ${formData.get('emi_amount')}`;
-                    document.getElementById('receiptDueAmount').textContent = `₹ ${data.new_due_amount}`;
+                    document.getElementById('receiptEmiAmount').textContent = formData.get('emi_amount');
+                    document.getElementById('receiptDueAmount').textContent = data.new_due_amount;
                     
                     document.getElementById('emiForm').style.display = 'none';
                     document.getElementById('receipt').style.display = 'block';
@@ -593,7 +618,7 @@
 
         function sendWhatsApp() {
             const memberMobile = document.getElementById('memberSelect').selectedOptions[0].dataset.mobile || '7253946012'; // Fallback
-            const message = `Dear ${document.getElementById('receiptMemberName').textContent}, Your EMI of ₹${document.getElementById('receiptEmiAmount').textContent.replace('₹ ', '')} has been received on ${document.getElementById('receiptPayDate').textContent}. Updated Due: ${document.getElementById('receiptDueAmount').textContent}. Thank you! - FINVESTACORE`;
+            const message = `Dear ${document.getElementById('receiptMemberName').textContent}, Your EMI of ₹${document.getElementById('receiptEmiAmount').textContent} has been received on ${document.getElementById('receiptPayDate').textContent}. Updated Due: ₹${document.getElementById('receiptDueAmount').textContent}. Thank you! - FINVESTACORE`;
             const whatsappUrl = `https://wa.me/91${memberMobile}?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
         }
