@@ -13,16 +13,27 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # SQLite DB setup
 DB_PATH = 'finvestacore.db'
 LOCK = threading.Lock() # For thread-safe
+
+# New helper function added
+def _round_amount(amount):
+    """Round amount to nearest whole rupee"""
+    return int(round(float(amount or 0), 0))
+
+
+
 def get_db_connection():
-    """Get a connection to the SQLite database."""
+    """Get a connection to the SQLite database with timeout and WAL."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row # Allows dict-like access
+    conn.execute("PRAGMA busy_timeout = 5000")  # 5s retry on lock
+    # WAL: Uncomment and run once on startup if not set: conn.execute("PRAGMA journal_mode = WAL")
     return conn
+
 def init_db():
     """Initialize the database with tables."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-                # Counters table for sequential IDs
+        # Counters table for sequential IDs
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS counters (
                 name TEXT PRIMARY KEY,
@@ -66,7 +77,7 @@ def init_db():
                 guarantor_relation TEXT NOT NULL DEFAULT ''
             )
         ''')
-       
+      
         # Force add missing columns (even if table exists)
         columns_to_add = [
             ('education', 'TEXT'),
@@ -82,7 +93,7 @@ def init_db():
                 cursor.execute(f'ALTER TABLE members ADD COLUMN {col_name} {col_type}')
             except sqlite3.OperationalError:
                 pass # Column already exists
-       
+      
         # Loans table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS loans (
@@ -313,68 +324,96 @@ def get_member_loan_details(member_id):
                 'emi': details['emi']
             }
     return None
+
 def record_emi_payment(member_id, pay_date, payment_mode, emi_amount):
-    with get_db_connection() as conn:
+    conn = get_db_connection()
+    try:
         cur = conn.cursor()
-        try:
-            # Get loan_id and details
+        
+        # Get loan details
+        cur.execute("""
+            SELECT l.loan_id, l.amount as principal, l.due_amount, l.total_paid, 
+                   l.repayment_type, l.tenure_days, l.tenure_months, l.emi,
+                   m.full_name as member_name
+            FROM loans l
+            JOIN members m ON l.member_id = m.id
+            WHERE l.member_id = ? AND l.status = 'Active'
+        """, (member_id,))
+        loan_row = cur.fetchone()
+        if not loan_row:
+            return False, 'No active loan for this member'
+        
+        loan_id = loan_row['loan_id']
+        current_due = float(loan_row['due_amount'] or 0)
+        current_total_paid = float(loan_row['total_paid'] or 0)
+        emi = float(loan_row['emi'])
+        member_name = loan_row['member_name']
+        
+        emi_amount = float(emi_amount)
+        
+        # Validation
+        if emi_amount <= 0:
+            return False, 'EMI amount must be positive'
+        if abs(emi_amount - emi) > 1 and emi_amount > current_due:  # Allow small variation
+            return False, f'EMI amount should be around ₹{emi:.2f}'
+        
+        # Begin transaction
+        cur.execute("BEGIN IMMEDIATE")
+        
+        # Insert into transactions
+        cur.execute("""
+            INSERT INTO transactions (loan_id, type, amount, pay_date, payment_mode, created_at)
+            VALUES (?, 'emi', ?, ?, ?, ?)
+        """, (loan_id, emi_amount, pay_date, payment_mode, datetime.now()))
+        
+        # Insert into payments
+        cur.execute("""
+            INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode, 
+                                emi_amount, interest_amount, advance_amount)
+            VALUES (?, ?, 'emi', ?, ?, ?, ?, 0, 0)
+        """, (member_id, loan_id, emi_amount, pay_date, payment_mode, emi_amount))
+        
+        # Update loan balances - Full EMI deduction from due
+        new_total_paid = current_total_paid + emi_amount
+        new_due = max(0, current_due - emi_amount)
+        
+        cur.execute("""
+            UPDATE loans
+            SET total_paid = ?, due_amount = ?
+            WHERE loan_id = ?
+        """, (round(new_total_paid, 2), round(new_due, 2), loan_id))
+        
+        # Auto close loan if due <= 0
+        if new_due <= 0.01:  # Small tolerance for floating point
             cur.execute("""
-                SELECT loan_id, amount as principal, due_amount, total_paid, repayment_type, tenure_days
-                FROM loans WHERE member_id = ? AND status = 'Active'
-            """, (member_id,))
-            loan = cur.fetchone()
-            if not loan:
-                return False, None
-            loan_id = loan['loan_id']
-            principal = loan['principal']
-            current_due = loan['due_amount'] or 0
-            current_paid = loan['total_paid'] or 0
-            repayment_type = loan['repayment_type']
-            tenure_days = loan['tenure_days'] or 120 # Default for daily
-            # Calculate total interest (for records only, not for due reduction)
-            total_interest = (emi_amount * tenure_days) - principal # e.g., 4000
-            interest_per_emi = round(total_interest / tenure_days, 2) # e.g., 33.33
-            actual_interest = interest_per_emi # Simplified for now (or pro-rate if needed)
-            actual_principal = emi_amount - actual_interest
-            # Insert transaction (full EMI)
-            cur.execute("""
-                INSERT INTO transactions (loan_id, type, amount, pay_date, payment_mode, created_at)
-                        VALUES (?, 'emi', ?, ?, ?, ?)
-                        """, (loan_id, emi_amount, pay_date, payment_mode, datetime.now()))
-            # Insert into payments (with interest breakdown for reports)
-            cur.execute("""
-            INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode, emi_amount, interest_amount, advance_amount)
-                VALUES (?, ?, 'emi', ?, ?, ?, ?, ?, 0)
-            """, (member_id, loan_id, emi_amount, pay_date, payment_mode, emi_amount, actual_interest))
-            # FIXED: Update loan - total_paid + full EMI, due_amount - full EMI (not just principal)
-            # This makes due = remaining EMIs * EMI_amount
-            cur.execute("""
-                UPDATE loans
-                SET total_paid = total_paid + ?, due_amount = due_amount - ?
+                UPDATE loans 
+                SET status = 'Closed', 
+                    loan_closed_date = ? 
                 WHERE loan_id = ?
-            """, (emi_amount, emi_amount, loan_id)) # <-- Key change: - emi_amount (full)
-            # FIXED: Check if loan closed - with rounding fix for floating point
-            cur.execute("SELECT due_amount FROM loans WHERE loan_id = ?", (loan_id,))
-            new_due_raw = cur.fetchone()[0]
-            new_due = round(new_due_raw, 2) if new_due_raw is not None else 0  # <-- Fix: Rounding to avoid float precision issues
-            if new_due <= 0:
-                cur.execute("UPDATE loans SET status = 'Closed', loan_closed_date = ? WHERE loan_id = ?", (datetime.now().strftime('%Y-%m-%d'), loan_id))
-                print(f"Loan {loan_id} closed automatically as due_amount <= 0")  # <-- Debug log
-            # Get updated details
-            cur.execute("""
-                SELECT m.full_name as name, l.loan_id, l.due_amount as new_due_amount
-                FROM members m JOIN loans l ON m.id = l.member_id
-                WHERE l.loan_id = ?
-            """, (loan_id,))
-            data = cur.fetchone()
-           
-            conn.commit()
-            print(f"DEBUG EMI: Interest={actual_interest}, Principal={actual_principal}, New Due={new_due}") # For logs
-            return True, dict(data)
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
-                       
+            """, (datetime.now().strftime('%Y-%m-%d'), loan_id))
+            print(f"✅ Loan {loan_id} auto-closed")
+        
+        conn.commit()
+        
+        return True, {
+            'name': member_name,
+            'loan_id': loan_id,
+            'new_due_amount': round(new_due, 2),
+            'total_paid': round(new_total_paid, 2)
+        }
+        
+    except sqlite3.OperationalError as e:
+        conn.rollback()
+        if 'database is locked' in str(e).lower():
+            return False, 'Database locked. Please try again in a moment.'
+        return False, str(e)
+    except Exception as e:
+        conn.rollback()
+        current_app.logger.error(f"EMI Payment Error: {e}")
+        return False, f'Error: {str(e)}'
+    finally:
+        conn.close()
+                      
 def record_advance_payment(loan_id, pay_date, payment_mode, advance_amount):
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -386,40 +425,40 @@ def record_advance_payment(loan_id, pay_date, payment_mode, advance_amount):
             loan = cur.fetchone()
             if not loan:
                 return False, None
-           
+          
             member_id = loan['member_id']
             current_due = loan['due_amount'] or 0
-           
+          
             # Advance reduces full amount (principal + any due interest)
             actual_advance = min(advance_amount, current_due) # Don't overpay
-           
+          
             # Insert transaction
             cur.execute("""
                 INSERT INTO transactions (loan_id, type, amount, pay_date, payment_mode, created_at)
                 VALUES (?, 'advance', ?, ?, ?, ?)
             """, (loan_id, actual_advance, pay_date, payment_mode, datetime.now()))
-           
+          
             # Insert into payments
             cur.execute("""
                 INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode, advance_amount, interest_amount)
                 VALUES (?, ?, 'advance', ?, ?, ?, ?, 0)
             """, (member_id, loan_id, actual_advance, pay_date, payment_mode, actual_advance))
-           
+          
             # FIXED: Update - total_paid + full advance, due_amount - full advance
             cur.execute("""
                 UPDATE loans
                 SET total_paid = total_paid + ?, due_amount = due_amount - ?
                 WHERE loan_id = ?
             """, (actual_advance, actual_advance, loan_id))
-           
+          
             # FIXED: Check close - with rounding
             cur.execute("SELECT due_amount FROM loans WHERE loan_id = ?", (loan_id,))
             new_due_raw = cur.fetchone()[0]
-            new_due = round(new_due_raw, 2) if new_due_raw is not None else 0  # <-- Fix: Rounding
+            new_due = round(new_due_raw, 2) if new_due_raw is not None else 0 # <-- Fix: Rounding
             if new_due <= 0:
                 cur.execute("UPDATE loans SET status = 'Closed', loan_closed_date = ? WHERE loan_id = ?", (datetime.now().strftime('%Y-%m-%d'), loan_id))
-                print(f"Loan {loan_id} closed automatically via advance")  # <-- Debug
-           
+                print(f"Loan {loan_id} closed automatically via advance") # <-- Debug
+          
             # Get updated details
             cur.execute("""
                 SELECT m.full_name as name, l.due_amount as new_due_amount
@@ -427,13 +466,13 @@ def record_advance_payment(loan_id, pay_date, payment_mode, advance_amount):
                 WHERE l.loan_id = ?
             """, (loan_id,))
             data = cur.fetchone()
-           
+          
             conn.commit()
             return True, dict(data)
         except Exception as e:
             conn.rollback()
             return False, str(e)
-               
+              
 def get_loan_by_id(loan_id):
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -447,7 +486,7 @@ def get_active_members_report(report_date_str):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
-       
+      
         cursor.execute("""
             SELECT l.loan_id, m.full_name as member_name, m.phone_number as mobile_no,
                    l.amount as loan_amount, l.total_paid, l.emi as emi_amount,
@@ -457,12 +496,12 @@ def get_active_members_report(report_date_str):
             WHERE l.status = 'Active' AND l.emi_start_date <= ?
         """, (report_date_str,))
         rows = cursor.fetchall()
-       
+      
         report_data = []
         for row in rows:
             loan = dict(row)
             start_date = datetime.strptime(loan['emi_start_date'], '%Y-%m-%d').date()
-           
+          
             # Calculate EMIs due till report_date
             if loan['repayment_type'] == 'monthly':
                 days_per_emi = 30
@@ -474,14 +513,14 @@ def get_active_members_report(report_date_str):
                 num_due_emis_till_date = (report_date - start_date).days + 1
                 num_due_emis_till_date = min(num_due_emis_till_date, loan['tenure_days'] or 120)
                 total_tenure = loan['tenure_days'] or 120
-           
+          
             expected_paid_till_date = num_due_emis_till_date * loan['emi_amount']
             due_till_date = max(0, expected_paid_till_date - (loan['total_paid'] or 0))
-           
+          
             # NEW: Total Due EMIs (remaining installments)
             paid_emis_approx = (loan['total_paid'] or 0) / loan['emi_amount']
             due_emi_count = max(0, total_tenure - round(paid_emis_approx))
-           
+          
             report_data.append({
                 'loan_id': loan['loan_id'],
                 'member_name': loan['member_name'],
@@ -493,9 +532,9 @@ def get_active_members_report(report_date_str):
                 'total_due': loan['total_due'] or 0,
                 'due_emi_count': due_emi_count # NEW COLUMN
             })
-       
+      
         return report_data
-   
+  
 def get_loan_dispatch_report(from_date_str, to_date_str):
     """Fetch loans dispatched between dates"""
     with get_db_connection() as conn:
@@ -511,7 +550,7 @@ def get_loan_dispatch_report(from_date_str, to_date_str):
         """, (from_date_str, to_date_str))
         rows = cursor.fetchall()
         conn.close()
-       
+      
         report_data = []
         for row in rows:
             report_data.append({
@@ -532,8 +571,9 @@ def get_member_info(member_id):
             return {'error': 'Member not found'}
     except Exception as e:
         return {'error': f'Database error: {str(e)}'}
+    
 def fetch_member_ledger_data(member_id, from_date_str, to_date_str):
-    """Fetch member's ledger transactions between dates - FIXED NO DUPLICATES"""
+    """Fetch member's ledger transactions between dates - NOW INCLUDES PENALTY"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -550,45 +590,47 @@ def fetch_member_ledger_data(member_id, from_date_str, to_date_str):
                     END as amount
                 FROM loans l
                 WHERE l.member_id = ? AND l.loan_date BETWEEN ? AND ?
+
                 UNION ALL
-                -- 2. All Payments (EMI + Advance) - Combined & Clean
+
+                -- 2. All Payments: EMI, Advance, and PENALTY
                 SELECT
                     t.pay_date as date,
-                    CASE
-                        WHEN t.type = 'emi' THEN 'emi_paid'
-                        WHEN t.type = 'advance' THEN 'advance_paid'
-                        ELSE 'other_payment'
-                    END as type,
+                    t.type as type,
                     CASE
                         WHEN t.type = 'emi' THEN 'EMI Payment'
                         WHEN t.type = 'advance' THEN 'Advance Payment'
+                        WHEN t.type = 'penalty' THEN 'Penalty Added'
                         ELSE 'Other Payment'
                     END as description,
                     t.amount as amount
                 FROM transactions t
                 JOIN loans l ON t.loan_id = l.loan_id
                 WHERE l.member_id = ?
-                  AND t.type IN ('emi', 'advance') -- Only these two
+                  AND t.type IN ('emi', 'advance', 'penalty')
                   AND t.pay_date BETWEEN ? AND ?
+
                 ORDER BY date ASC
             """, (
                 member_id, from_date_str, to_date_str,
                 member_id, from_date_str, to_date_str
             ))
+            
             rows = cursor.fetchall()
-          
+         
             ledger_data = []
             for row in rows:
-                amount = row[3] or 0
+                amount = float(row[3] or 0)
                 ledger_data.append({
                     'date': row[0],
                     'type': row[1],
                     'description': row[2],
-                    'amount': float(amount) if amount > 0 else -abs(float(amount)) # Negative for disbursed if needed
+                    'amount': amount
                 })
             return ledger_data
     except Exception as e:
         raise ValueError(f"Ledger fetch error: {str(e)}")
+    
 def get_pnl_report_data(from_date_str, to_date_str):
     """Calculate P&L - FIXED: No interest_paid (always 0), add totals"""
     try:
@@ -596,42 +638,42 @@ def get_pnl_report_data(from_date_str, to_date_str):
         datetime.strptime(to_date_str, '%Y-%m-%d')
     except ValueError:
         raise ValueError("Invalid date format: Use YYYY-MM-DD")
-  
+ 
     with get_db_connection() as conn:
         cursor = conn.cursor()
-      
+     
         # Interest income (from emi interest_amount - now correct)
         cursor.execute("""
             SELECT COALESCE(SUM(interest_amount), 0) FROM payments
             WHERE pay_date BETWEEN ? AND ? AND type = 'emi'
         """, (from_date_str, to_date_str))
         interest_income = round(cursor.fetchone()[0], 2)
-      
+     
         # Other income (fees)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM fees
             WHERE fee_date BETWEEN ? AND ?
         """, (from_date_str, to_date_str))
         other_income = round(cursor.fetchone()[0], 2)
-      
+     
         total_income = interest_income + other_income
-      
+     
         # Operating expenses
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM expenses
             WHERE date BETWEEN ? AND ? AND category = 'operating'
         """, (from_date_str, to_date_str))
         operating_expenses = round(cursor.fetchone()[0], 2)
-      
+     
         # FIXED: Interest paid removed (add if borrowings interest table exists)
         interest_paid = 0.0 # Or query from new table if needed
-      
+     
         total_expenses = operating_expenses + interest_paid
         net_profit = total_income - total_expenses
-      
+     
         # Debug
         print(f"DEBUG P&L ({from_date_str} to {to_date_str}): Income={total_income}, Expenses={total_expenses}, Net={net_profit}")
-      
+     
         return {
             'interest_income': interest_income,
             'other_income': other_income,
@@ -641,7 +683,7 @@ def get_pnl_report_data(from_date_str, to_date_str):
             'total_expenses': total_expenses, # NEW
             'net_profit': net_profit # NEW: Positive/negative
         }
-       
+      
 def fetch_loan_dispatch_report_data(from_date_str, to_date_str): # Renamed!
     """Fetch loans dispatched between dates"""
     with get_db_connection() as conn:
@@ -657,7 +699,7 @@ def fetch_loan_dispatch_report_data(from_date_str, to_date_str): # Renamed!
         """, (from_date_str, to_date_str))
         rows = cursor.fetchall()
         # Removed conn.close() - with statement handles it
-       
+      
         report_data = []
         for row in rows:
             report_data.append({
@@ -685,63 +727,63 @@ def get_bank_report_data(report_date_str):
     """Calculate updated cash in hand and bank balance up to date - FIXED: Include advance/penalty in cash inflows"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-      
+     
         # FIXED: Cash Inflows - EMI + Advance + Penalty (all positive cash payments)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type IN ('emi', 'advance', 'penalty') AND payment_mode = 'Cash' AND pay_date <= ?
         """, (report_date_str,))
         cash_inflows = cursor.fetchone()[0]
-      
+     
         # Loan Cash Outflow (disbursements)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode = 'Cash' AND loan_date <= ?
         """, (report_date_str,))
         loan_cash = cursor.fetchone()[0]
-      
+     
         # Cash Deposits Outflow (to bank)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM deposits
             WHERE deposit_date <= ? AND type = 'cash_deposit'
         """, (report_date_str,))
         cash_deposited = cursor.fetchone()[0]
-            
+           
         # Cash in Hand: Inflows - Loans - Deposits
         cash_in_hand = round(cash_inflows - loan_cash - cash_deposited, 2)
         cash_in_hand = max(0, cash_in_hand)
-      
+     
         # NEW: Investments added to Bank (all types)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM investments
             WHERE date <= ?
         """, (report_date_str,))
         total_investments = cursor.fetchone()[0]
-      
+     
         # FIXED: Bank Inflows - UPI EMI + Advance + Penalty
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type IN ('emi', 'advance', 'penalty') AND payment_mode = 'UPI' AND pay_date <= ?
         """, (report_date_str,))
         upi_inflows = cursor.fetchone()[0]
-      
+     
         # Bank Loan Outflow (NEFT/IMPS)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode IN ('NEFT', 'IMPS') AND loan_date <= ?
         """, (report_date_str,))
         loan_neft_imps = cursor.fetchone()[0]
-      
+     
         # Bank Balance: UPI Inflows + Investments - Bank Loans + Cash Deposited
         bank_balance = round(upi_inflows + total_investments - loan_neft_imps + cash_deposited, 2)
         bank_balance = max(0, bank_balance)
-      
+     
         # Debug log
         print(f"DEBUG Bank Report ({report_date_str}): Cash Inflows=₹{cash_inflows}, Loan Cash Out=₹{loan_cash}, Deposited=₹{cash_deposited}, Cash in Hand=₹{cash_in_hand}")
         print(f"Bank: UPI Inflows=₹{upi_inflows}, Investments=₹{total_investments}, Bank Loans=₹{loan_neft_imps}, Balance=₹{bank_balance}")
-      
+     
         return {'cash_in_hand': cash_in_hand, 'bank_balance': bank_balance}
-       
+      
 def add_payment_mode_column():
     conn = sqlite3.connect('finvestacore.db')
     cursor = conn.cursor()
@@ -756,55 +798,71 @@ def add_payment_mode_column():
             print(f"Error: {e}")
     finally:
         conn.close()
+
 def add_penalty_to_loan(loan_id, penalty_amount, penalty_date, description, payment_mode='Cash'):
     """Add penalty to loan: Update due_amount, insert records."""
     with get_db_connection() as conn:
         cur = conn.cursor()
         try:
-            # Verify loan active
-            cur.execute("SELECT member_id, due_amount FROM loans WHERE loan_id = ? AND status = 'Active'", (loan_id,))
+            # Verify loan
+            cur.execute("""
+                SELECT member_id, due_amount, status 
+                FROM loans 
+                WHERE loan_id = ? 
+            """, (loan_id,))
             loan = cur.fetchone()
+            
             if not loan:
-                return False, "Loan not found or not active."
-           
+                return False, "Loan not found."
+            if loan['status'] not in ['Active', 'Pending']:
+                return False, "Loan must be Active or Pending to add penalty."
+
             member_id = loan['member_id']
-            current_due = loan['due_amount'] or 0
-           
-            # Insert into transactions (positive for penalty income)
+            current_due = float(loan['due_amount'] or 0)
+            
+            penalty_amount = _round_amount(penalty_amount)  # Ensure whole number
+
+            if penalty_amount <= 0:
+                return False, "Penalty amount must be greater than 0."
+
+            # Insert into transactions
             cur.execute("""
                 INSERT INTO transactions (loan_id, type, amount, pay_date, payment_mode, created_at)
                 VALUES (?, 'penalty', ?, ?, ?, ?)
             """, (loan_id, penalty_amount, penalty_date, payment_mode, datetime.now()))
-           
-            # Insert into payments (for reports)
+
+            # Insert into payments
             cur.execute("""
-                INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode, emi_amount)
-                VALUES (?, ?, 'penalty', ?, ?, ?, 0)
-            """, (member_id, loan_id, penalty_amount, penalty_date, payment_mode, penalty_amount))
-           
-            # Update loan due_amount += penalty
+                INSERT INTO payments 
+                (member_id, loan_id, type, amount, pay_date, payment_mode, 
+                 emi_amount, advance_amount, interest_amount)
+                VALUES (?, ?, 'penalty', ?, ?, ?, 0, 0, 0)
+            """, (member_id, loan_id, penalty_amount, penalty_date, payment_mode))
+
+            # Update due amount
             new_due = current_due + penalty_amount
-            cur.execute("""
-                UPDATE loans SET due_amount = ? WHERE loan_id = ?
-            """, (round(new_due, 2), loan_id))
-           
-            # Get updated details
+            cur.execute("UPDATE loans SET due_amount = ? WHERE loan_id = ?", 
+                       (new_due, loan_id))
+
+            # Get updated info
             cur.execute("""
                 SELECT m.full_name as name, l.due_amount as new_due_amount
-                FROM members m JOIN loans l ON m.id = l.member_id WHERE l.loan_id = ?
+                FROM members m 
+                JOIN loans l ON m.id = l.member_id 
+                WHERE l.loan_id = ?
             """, (loan_id,))
             data = cur.fetchone()
-           
+
             conn.commit()
             return True, dict(data)
+
         except Exception as e:
             conn.rollback()
-            return False, str(e)
-       
+            current_app.logger.error(f"Add Penalty Error: {e}")
+            return False, f"Database error: {str(e)}"
+      
 # --- Flask Routes ---
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-# ... (baaki imports same rahenge)
-# Root route ko redirect to login kar do
+
 @app.route('/')
 def home():
     return redirect(url_for('login'))
@@ -814,7 +872,7 @@ def login():
     if request.method == 'POST':
         user_type = request.form.get('userType')
         password = request.form.get('password')
-       
+      
         # Demo auth (prod mein DB se check karo, e.g., users table)
         if user_type == 'admin' and password == 'admin123':
             session['logged_in'] = True
@@ -823,17 +881,17 @@ def login():
             return redirect(url_for('dashboard')) # /index.html pe jaayega
         else:
             flash('Invalid credentials. Try again.', 'error')
-   
+  
     # GET: Show login if not logged in
     if session.get('logged_in'):
         return redirect(url_for('dashboard'))
-   
+  
     # Member count for login page (optional)
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM members')
         member_count = cursor.fetchone()[0]
-   
+  
     return render_template('login.html', member_count=member_count)
 # Dashboard route (index.html)
 @app.route('/index.html')
@@ -841,20 +899,20 @@ def dashboard():
     if not session.get('logged_in'):
         flash('Please log in to access the dashboard.', 'error')
         return redirect(url_for('login'))
-   
+  
     # Dashboard data fetch (fix queries as per your DB)
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM members')
         member_count = cursor.fetchone()[0]
-       
+      
         cursor.execute('SELECT COALESCE(SUM(amount), 0) FROM loans WHERE status = "Active"')
         active_loans = cursor.fetchone()[0] or 0
-       
+      
         today = datetime.now().strftime('%Y-%m-%d')
         cursor.execute('SELECT COALESCE(SUM(amount), 0) FROM payments WHERE type="emi" AND pay_date = ?', (today,))
         todays_collection = cursor.fetchone()[0] or 0
-       
+      
         # Simple monthly growth
         cursor.execute("""
             SELECT
@@ -873,7 +931,7 @@ def dashboard():
         """)
         result = cursor.fetchone()
         monthly_growth = result[0] if result and result[0] is not None else 0
-   
+  
     return render_template('index.html',
                           member_count=member_count,
                           active_loans=active_loans,
@@ -902,7 +960,7 @@ def add_member():
             # --- 1. Basic Validation ---
             full_name = clean_input('full_name')
             phone_number = clean_input('phone_number')
-           
+          
             if not full_name:
                 flash('Full Name is a required field and cannot be empty.', 'error')
                 return render_template('add_member.html', form_data=form_data)
@@ -958,10 +1016,10 @@ def add_member():
                     cursor.execute('SELECT 1 FROM members WHERE pan = ? AND id != ?', (pan, ''))
                     if cursor.fetchone():
                         raise ValueError("Error: A member with this **PAN Number** already exists.")
-           
+          
             # Generate next ID
             new_member_id = get_next_member_id()
-           
+          
             # Prepare data
             data = {
                 'id': new_member_id,
@@ -994,7 +1052,7 @@ def add_member():
                 'nominee_relation': nominee_relation,
                 'guarantor_relation': guarantor_relation
             }
-           
+          
             # Insert
             with get_db_connection() as conn:
                 cursor = conn.cursor()
@@ -1007,7 +1065,7 @@ def add_member():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', tuple(data.values()))
                 conn.commit()
-           
+          
             flash(f'Member **{full_name}** added successfully with ID: **{new_member_id}**', 'success')
             return redirect(url_for('member_details'))
         except ValueError as e:
@@ -1268,13 +1326,13 @@ def add_loan():
             ''', (loan_id, member_id, loan_type, amount, purpose, tenure_months, tenure_days, interest_rate, emi,
                   emi_type, repayment_type, guarantor_id, datetime.now().strftime('%Y-%m-%d'), loan_date,
                   payment_mode, ref_id, emi_start_date, emi_end_date, total_due)) # FIXED: due_amount = total_due
-           
+          
             # Insert disbursed payment (negative for principal)
             cursor.execute("""
                 INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode)
                 VALUES (?, ?, 'loan_disbursed', -?, ?, ?)
             """, (member_id, loan_id, amount, loan_date, payment_mode)) # Negative amount for outflow
-           
+          
             conn.commit()
         current_app.logger.info(f"Loan {loan_id} added successfully. EMI: {emi}, Due: {total_due}")
         return jsonify({'success': True, 'loan_id': loan_id})
@@ -1286,7 +1344,7 @@ def add_loan():
         import traceback
         current_app.logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
-   
+  
 @app.route('/complete_loan', methods=['POST'])
 def complete_loan():
     try:
@@ -1321,7 +1379,7 @@ def complete_loan():
                 total_paid=0, due_amount=?
                 WHERE loan_id=?
             ''', (loan_date, payment_mode, ref_id, emi_start_date, emi_end_date, total_due, loan_id))
-           
+          
             # Insert disbursed payment (negative for outflow)
             cursor.execute("""
                 INSERT INTO payments (member_id, loan_id, type, amount, pay_date, payment_mode)
@@ -1334,7 +1392,7 @@ def complete_loan():
         current_app.logger.error(f"Complete loan error: {e}")
         flash(f'Error: {e}', 'error')
         return redirect(url_for('loan_list')) # FIXED: Consistent redirect
-   
+  
 @app.route('/loan_list')
 def loan_list():
     loans_list = []
@@ -1342,8 +1400,8 @@ def loan_list():
         cursor = conn.cursor()
         # Updated query: Join with members to fetch member_name, and removed emi_start_date from SELECT
         cursor.execute("""
-            SELECT l.loan_id, l.member_id, l.loan_type, l.amount, l.emi, l.due_amount, l.status, 
-                   l.loan_date, l.emi_start_date, l.loan_closed_date, l.total_paid,  -- Keep other fields as needed
+            SELECT l.loan_id, l.member_id, l.loan_type, l.amount, l.emi, l.due_amount, l.status,
+                   l.loan_date, l.emi_start_date, l.loan_closed_date, l.total_paid, -- Keep other fields as needed
                    m.full_name as member_name
             FROM loans l
             JOIN members m ON l.member_id = m.id
@@ -1353,7 +1411,6 @@ def loan_list():
         for row in rows:
             loans_list.append(dict(row))
     return render_template('loan_list.html', loans=loans_list)
-
 @app.route('/get_member_details/<member_id>', methods=['GET'])
 def get_member_details(member_id):
     """Fetch member loan details for EMI payment form."""
@@ -1419,78 +1476,50 @@ def delete_emi(payment_id):
     except Exception as e:
         current_app.logger.error(f"Error deleting EMI {payment_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/pay_emi', methods=['GET', 'POST'])
 def pay_emi():
     if request.method == 'GET':
-        active_members = get_active_members() # List of {'member_id': , 'name': , 'mobile': }
-        last_emi_info = {} # For last paid EMI per member
+        # For backward compatibility or other pages
+        active_members = get_active_members()
         today = datetime.now().strftime('%Y-%m-%d')
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            for member in active_members:
-                member_id = member['member_id']
-                # Fetch last EMI payment details
-                cursor.execute("""
-                    SELECT pay_date, transactions.amount as emi_amount, transactions.payment_mode as mode
-                    FROM transactions
-                    JOIN loans ON transactions.loan_id = loans.loan_id
-                    WHERE loans.member_id = ? AND transactions.type = 'emi'
-                    ORDER BY pay_date DESC LIMIT 1
-                """, (member_id,))
-                last_payment = cursor.fetchone()
-                if last_payment:
-                    last_emi_info[member_id] = {
-                        'last_pay_date': last_payment['pay_date'],
-                        'last_emi_amount': last_payment['emi_amount'],
-                        'last_mode': last_payment['mode']
-                    }
-                else:
-                    # If no previous, get current EMI
-                    cursor.execute("SELECT emi FROM loans WHERE member_id = ? AND status = 'Active'", (member_id,))
-                    emi_row = cursor.fetchone()
-                    last_emi_info[member_id] = {
-                        'last_pay_date': None,
-                        'last_emi_amount': emi_row['emi'] if emi_row else 0,
-                        'last_mode': None
-                    }
-        return render_template('pay_emi.html', active_members=active_members, last_emi_info=last_emi_info, today=today)
-   
-    # POST - AJAX JSON response
-    member_id = request.form.get('member_id')
-    if not member_id:
-        return jsonify({'success': False, 'error': 'Member ID required'})
-   
-    # Get active loan for member
+        return render_template('pay_emi.html', active_members=active_members, today=today)
+    
+    # POST - Handle EMI Payment by Loan ID
+    loan_id = request.form.get('loan_id')
+    pay_date = request.form.get('pay_date')
+    payment_mode = request.form.get('payment_mode')
+    emi_amount = request.form.get('emi_amount')
+
+    if not all([loan_id, pay_date, payment_mode, emi_amount]):
+        return jsonify({'success': False, 'error': 'Missing required fields'})
+
+    # Get member_id from loan_id
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT loan_id, emi FROM loans WHERE member_id = ? AND status = "Active"', (member_id,))
+        cursor.execute("SELECT member_id FROM loans WHERE loan_id = ? AND status = 'Active'", (loan_id.strip().upper(),))
         loan_row = cursor.fetchone()
         if not loan_row:
-            return jsonify({'success': False, 'error': 'No active loan for this member'})
-        loan_id = loan_row['loan_id']
-        emi = loan_row['emi']
-   
-    pay_date = request.form.get('pay_date', datetime.now().strftime('%Y-%m-%d'))
-    payment_mode = request.form.get('payment_mode')
-    emi_amount = float(request.form.get('emi_amount', emi))
-   
+            return jsonify({'success': False, 'error': 'Loan not found or not active'})
+
+        member_id = loan_row['member_id']
+
+    # Record payment using member_id (existing function)
     success, data = record_emi_payment(member_id, pay_date, payment_mode, emi_amount)
+    
     if success:
-        data['loan_id'] = loan_id # Ensure loan_id in response
-        data['name'] = data.get('name', '') # From record_emi_payment
-        return jsonify({'success': True, **data}) # {success: True, name: , loan_id: , new_due_amount: }
-    return jsonify({'success': False, 'error': str(data)})
+        data['loan_id'] = loan_id  # Add loan_id in response
+        return jsonify({'success': True, **data})
+    else:
+        return jsonify({'success': False, 'error': data})
+    
+# Remove or deprecate /process_emi_payment as it's redundant
+# If needed for legacy, redirect or merge into above
 @app.route('/process_emi_payment', methods=['POST'])
 def process_emi_payment():
-    member_id = request.form['member_id']
-    pay_date = request.form['pay_date']
-    payment_mode = request.form['payment_mode']
-    emi_amount = float(request.form['emi_amount'])
-   
-    success, data = record_emi_payment(member_id, pay_date, payment_mode, emi_amount) # DB function
-    if success:
-        return jsonify({'success': True, 'name': data['name'], 'loan_id': data['loan_id'], 'new_due_amount': data['new_due_amount']})
-    return jsonify({'error': 'Payment failed'})
+    # Redirect to main handler for consistency
+    return pay_emi()  # Reuse the POST logic
+
 @app.route('/pay_advance', methods=['GET', 'POST'])
 def pay_advance():
     if request.method == 'POST':
@@ -1498,25 +1527,25 @@ def pay_advance():
         if not loan_id:
             flash('Loan ID required', 'error')
             return render_template('pay_advance.html', error="Loan ID not found!")
-       
+      
         loan_data = get_loan_by_id(loan_id)
         if not loan_data:
             flash('Loan not found', 'error')
             return render_template('pay_advance.html', error="Loan ID not found!")
-       
+      
         # Fetch member name
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan_data['member_id'],))
             member = cursor.fetchone()
             loan_data['member_name'] = member[0] if member else 'N/A'
-       
+      
         # ENHANCED: Add EMI and due_amount to template context for display
         loan_data['display_emi'] = loan_data.get('emi', 0)
         loan_data['display_due'] = loan_data.get('due_amount', 0)
-       
+      
         return render_template('pay_advance.html', loan_data=loan_data)
-   
+  
     return render_template('pay_advance.html')
 @app.route('/emi_due_report', methods=['GET', 'POST'])
 def emi_due_report():
@@ -1530,7 +1559,7 @@ def get_emi_due_report():
     report_date = request.args.get('date')
     if not report_date:
         return jsonify({'error': 'Date required'})
-   
+  
     try:
         data = get_active_members_report(report_date) # Your function
         return jsonify(data)
@@ -1545,7 +1574,7 @@ def get_loan_dispatch_report(): # Route name unchanged
     to_date = request.args.get('to_date')
     if not from_date or not to_date:
         return jsonify({'error': 'Dates required'})
-   
+  
     try:
         data = fetch_loan_dispatch_report_data(from_date, to_date) # Updated call!
         return jsonify(data)
@@ -1562,7 +1591,7 @@ def get_bank_report():
     report_date = request.args.get('date')
     if not report_date:
         return jsonify({'error': 'Date required'})
-   
+  
     try:
         data = get_bank_report_data(report_date)
         return jsonify(data)
@@ -1590,14 +1619,14 @@ def get_member_ledger_route(): # Renamed route for clarity, but URL unchanged
     to_date = request.args.get('to_date')
     if not all([member_id, from_date, to_date]):
         return jsonify({'error': 'Member ID and dates required'})
-   
+  
     try:
         data = fetch_member_ledger_data(member_id, from_date, to_date) # Updated call!
         return jsonify(data)
     except Exception as e:
         current_app.logger.error(f"Ledger error: {e}")
         return jsonify({'error': str(e)})
-   
+  
 @app.route('/profit_loss_report', methods=['GET'])
 def profit_loss_report():
     return render_template('profit_loss_report.html')
@@ -1607,7 +1636,7 @@ def get_pnl_report():
     to_date = request.args.get('to_date')
     if not from_date or not to_date:
         return jsonify({'error': 'Dates required'})
-   
+  
     try:
         data = get_pnl_report_data(from_date, to_date)
         return jsonify(data)
@@ -1622,92 +1651,92 @@ def get_balance_sheet_data(balance_date_str):
         datetime.strptime(balance_date_str, '%Y-%m-%d').date() # Validate
     except ValueError:
         raise ValueError("Invalid date format: Use YYYY-MM-DD")
-   
+  
     with get_db_connection() as conn:
         cursor = conn.cursor()
-       
+      
         # FIXED Cash in Hand calculation - Ensure correct rounding and max(0)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type = 'emi' AND payment_mode = 'Cash' AND pay_date <= ?
         """, (balance_date_str,))
         emi_cash = cursor.fetchone()[0]
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode = 'Cash' AND loan_date <= ?
         """, (balance_date_str,))
         loan_cash = cursor.fetchone()[0]
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM deposits
             WHERE deposit_date <= ? AND type = 'cash_deposit'
         """, (balance_date_str,))
         cash_deposited = cursor.fetchone()[0]
-       
+      
         # FIXED: Round each component and ensure positive
         cash_in_hand = max(0, round(emi_cash - loan_cash - cash_deposited, 2))
         # If still not 9600, perhaps adjust data; for now, assume query fix or manual set if needed
         # To force 9600 for testing: cash_in_hand = 9600.00 # Uncomment if data issue
-       
+      
         # Bank Balance
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM investments
             WHERE date <= ?
         """, (balance_date_str,))
         total_investments = cursor.fetchone()[0]
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type = 'emi' AND payment_mode = 'UPI' AND pay_date <= ?
         """, (balance_date_str,))
         emi_upi = cursor.fetchone()[0]
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode IN ('NEFT', 'IMPS') AND loan_date <= ?
         """, (balance_date_str,))
         loan_neft_imps = cursor.fetchone()[0]
-       
+      
         bank_balance = max(0, round(emi_upi + total_investments - loan_neft_imps + cash_deposited, 2))
-       
+      
         # Capital = Cash in Hand + Bank Balance (as per request, connects with Bank Report)
         capital = round(cash_in_hand + bank_balance, 2)
-       
+      
         # Other Assets
         cursor.execute("""
             SELECT COALESCE(SUM(due_amount), 0) FROM loans WHERE status = 'Active'
         """)
         loans_outstanding = max(0, round(cursor.fetchone()[0], 2))
-       
+      
         # Investments shown separately if not in bank (adjust based on data)
         investments = total_investments # Or 0 if included in bank; here separate as per output
-       
+      
         # Liabilities
         cursor.execute("""
             SELECT COALESCE(SUM(outstanding_amount), 0) FROM borrowings WHERE due_date >= ?
         """, (balance_date_str,))
         borrowings = max(0, round(cursor.fetchone()[0], 2))
-       
+      
         # Retained Earnings
         cursor.execute("""
             SELECT COALESCE(SUM(interest_amount - COALESCE(expense_amount, 0)), 0) FROM cumulative_pnl
             WHERE period_end <= ?
         """, (balance_date_str,))
         retained_earnings = round(cursor.fetchone()[0], 2)
-       
+      
         # Total Assets
         total_assets = round(cash_in_hand + bank_balance + investments + loans_outstanding, 2)
-       
+      
         # Adjust Retained Earnings to ensure Assets = Liabilities + Equity
         adjusted_retained = round(total_assets - borrowings - capital, 2)
         retained_earnings = adjusted_retained
-       
+      
         # Total Liabilities & Equity
         total_liabilities_equity = round(borrowings + capital + retained_earnings, 2)
-       
+      
         print(f"DEBUG BS ({balance_date_str}): Cash in Hand=₹{cash_in_hand}, Bank=₹{bank_balance}, Capital=₹{capital}, Retained=₹{retained_earnings}, Total Assets=₹{total_assets}")
-       
+      
         return {
             'cash_in_hand': cash_in_hand,
             'bank_balance': bank_balance,
@@ -1719,7 +1748,7 @@ def get_balance_sheet_data(balance_date_str):
             'total_assets': total_assets,
             'total_liabilities_equity': total_liabilities_equity
         }
-                           
+                          
 @app.route('/investments_expenses', methods=['GET'])
 def investments_expenses():
     return render_template('investments_expenses.html')
@@ -1729,26 +1758,26 @@ def add_investment():
         # Use request.form for HTML form data
         data = request.form
         payment_mode = request.form.get('payment_mode', 'UPI') # Default UPI
-       
+      
         # Validation (force UPI)
         if payment_mode != 'UPI':
             return jsonify({'success': False, 'error': 'Only UPI/Online allowed for investments'})
-       
+      
         # Required fields check (description optional)
         required_fields = ['date', 'type', 'amount']
         missing = [field for field in required_fields if not data.get(field)]
         if missing:
             return jsonify({'success': False, 'error': f'Missing fields: {", ".join(missing)}'})
-       
+      
         try:
             amount = float(data['amount'])
             if amount <= 0:
                 return jsonify({'success': False, 'error': 'Amount must be positive'})
         except ValueError:
             return jsonify({'success': False, 'error': 'Invalid amount'})
-       
+      
         description = data.get('description', '') # Optional, default empty
-       
+      
         # Inner try for DB
         try:
             with get_db_connection() as conn:
@@ -1761,13 +1790,13 @@ def add_investment():
         except Exception as db_error: # Catch DB-specific errors
             print(f"DB Error: {db_error}") # Console में log
             return jsonify({'success': False, 'error': f'Database error: {str(db_error)}'}), 500
-       
+      
         return jsonify({'success': True, 'message': 'Investment added successfully'})
-   
+  
     except Exception as e: # Catch any other unexpected error
         print(f"Unexpected error in add_investment: {e}") # Log for debugging
         return jsonify({'success': False, 'error': f'Internal server error: {str(e)}'}), 500
-   
+  
 @app.route('/add_expense', methods=['POST'])
 def add_expense():
     data = request.json
@@ -1792,15 +1821,15 @@ def get_invest_expense_report():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-           
+          
             # Fetch investments
             cursor.execute("SELECT date, type as invest_type, description, amount FROM investments ORDER BY date DESC")
             investments = [dict(row) for row in cursor.fetchall()]
-           
+          
             # Fetch expenses
             cursor.execute("SELECT date, category as expense_category, description, amount FROM expenses ORDER BY date DESC")
             expenses = [dict(row) for row in cursor.fetchall()]
-       
+      
         report_data = []
         for row in investments:
             report_data.append({
@@ -1812,22 +1841,22 @@ def get_invest_expense_report():
                 'date': row['date'], 'type': 'expense', 'expense_category': row['expense_category'],
                 'description': row['description'], 'amount': row['amount']
             })
-       
+      
         # Safe sort: handle None dates by treating as earliest
         def safe_date_key(item):
             try:
                 return datetime.strptime(item['date'], '%Y-%m-%d') if item['date'] else datetime.min
             except ValueError:
                 return datetime.min
-       
+      
         report_data.sort(key=safe_date_key, reverse=True)
-       
+      
         return jsonify(report_data)
-   
+  
     except Exception as e:
         current_app.logger.error(f"Invest/Expense report error: {e}")
         return jsonify({'error': f'Failed to load report: {str(e)}'}), 500
-   
+  
 @app.route('/loan/view/<loan_id>')
 def view_loan(loan_id):
     loan = get_loan_by_id(loan_id)
@@ -1843,25 +1872,52 @@ def view_loan(loan_id):
     return render_template('view_loan.html', loan=loan) # You'll need view_loan.html later
 @app.route('/loan/edit/<loan_id>', methods=['GET', 'POST'])
 def edit_loan(loan_id):
+    # Fetch all members for dropdown (common for GET and POST)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, full_name FROM members ORDER BY full_name ASC')
+        members_rows = cursor.fetchall()
+        members = [dict(row) for row in members_rows]
+    
+    # Fetch loan early (for both GET and POST, and errors)
+    loan = get_loan_by_id(loan_id)
+    if not loan:
+        flash('Loan not found.', 'error')
+        return redirect(url_for('loan_list'))
+    
+    # Enhance loan with names (for display)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['member_id'],))
+        member = cursor.fetchone()
+        loan['member_name'] = member[0] if member else 'N/A'
+        if loan.get('guarantor_id'):
+            cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['guarantor_id'],))
+            guarantor = cursor.fetchone()
+            loan['guarantor_name'] = guarantor[0] if guarantor else 'N/A'
+    
+    form_data = {}  # Default empty
     if request.method == 'POST':
-        form_data = request.form
+        form_data = request.form.to_dict()  # Convert to dict for easy access
         try:
             def clean_input(key, upper=False):
                 value = form_data.get(key, '').strip()
                 return None if not value else (value.upper() if upper else value)
+            
             # Required fields
             member_id = clean_input('member_id')
             loan_type = clean_input('loan_type')
             repayment_type = clean_input('repayment_type')
             if not all([member_id, loan_type, repayment_type]):
-                flash('Member ID, Loan Type, and Repayment Type required.', 'error')
-                return render_template('edit_loan.html', form_data=form_data, loan_id=loan_id)
+                raise ValueError('Member ID, Loan Type, and Repayment Type required.')
+            
             # Validate member exists
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('SELECT 1 FROM members WHERE id = ?', (member_id,))
                 if not cursor.fetchone():
                     raise ValueError("Member not found.")
+            
             # Optional fields
             purpose = clean_input('purpose')
             guarantor_id = clean_input('guarantor_id')
@@ -1869,6 +1925,7 @@ def edit_loan(loan_id):
                 cursor.execute('SELECT 1 FROM members WHERE id = ?', (guarantor_id,))
                 if not cursor.fetchone():
                     raise ValueError("Guarantor not found.")
+            
             # Amount/EMI recalc
             amount = None
             interest_rate = None
@@ -1901,11 +1958,12 @@ def edit_loan(loan_id):
                 if not amount_str:
                     raise ValueError('Amount required for daily repayment.')
                 amount = float(amount_str)
-                tenure_days = 120 # Fixed
+                tenure_days = 120  # Fixed
                 emi = round(amount / 100, 0)
                 total_due = emi * tenure_days
             else:
                 raise ValueError('Invalid repayment type')
+            
             # Date fields
             loan_date = clean_input('loan_date')
             payment_mode = clean_input('payment_mode')
@@ -1914,21 +1972,22 @@ def edit_loan(loan_id):
             emi_end_date = clean_input('emi_end_date')
             if not all([loan_date, payment_mode, emi_start_date]):
                 raise ValueError('Loan Date, Payment Mode, and EMI Start Date required.')
+            
             # Auto-calc emi_end_date if missing
             if not emi_end_date:
                 start_dt = datetime.strptime(emi_start_date, '%Y-%m-%d')
                 days = (tenure_months * 30) if repayment_type == 'monthly' else (tenure_days or 120)
                 end_dt = start_dt + timedelta(days=days)
                 emi_end_date = end_dt.strftime('%Y-%m-%d')
-            # Adjust due_amount if changing total_due (preserve existing total_paid)
+            
+            # Adjust due_amount (preserve existing total_paid)
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('SELECT total_paid FROM loans WHERE loan_id = ?', (loan_id,))
                 existing = cursor.fetchone()
-                if not existing:
-                    raise ValueError("Loan not found.")
                 existing_total_paid = existing['total_paid'] or 0
-                new_due_amount = max(0, total_due - existing_total_paid) # Ensure non-negative
+                new_due_amount = max(0, total_due - existing_total_paid)
+            
             # Update loan
             with get_db_connection() as conn:
                 cursor = conn.cursor()
@@ -1943,31 +2002,22 @@ def edit_loan(loan_id):
                 conn.commit()
                 if cursor.rowcount == 0:
                     raise ValueError("Loan not found for update.")
+            
             flash(f'Loan **{loan_id}** updated successfully! New EMI: ₹{emi:.2f}, Due: ₹{new_due_amount:.2f}', 'success')
             return redirect(url_for('loan_list'))
+        
         except ValueError as e:
             flash(str(e), 'error')
-            return render_template('edit_loan.html', form_data=form_data, loan_id=loan_id)
+            # Pass form_data for repopulation
+            return render_template('edit_loan.html', loan=loan, members=members, form_data=form_data, loan_id=loan_id)
         except Exception as e:
             flash(f'Error: {e}', 'error')
             current_app.logger.error(f"Update loan error: {e}")
-            return render_template('edit_loan.html', form_data=form_data, loan_id=loan_id)
-    # GET: Fetch existing loan and render form
-    loan = get_loan_by_id(loan_id)
-    if not loan:
-        flash('Loan not found.', 'error')
-        return redirect(url_for('loan_list'))
-    # Fetch member/guarantor names for display
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['member_id'],))
-        member = cursor.fetchone()
-        loan['member_name'] = member[0] if member else 'N/A'
-        if loan['guarantor_id']:
-            cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['guarantor_id'],))
-            guarantor = cursor.fetchone()
-            loan['guarantor_name'] = guarantor[0] if guarantor else 'N/A'
-    return render_template('edit_loan.html', loan=loan)
+            return render_template('edit_loan.html', loan=loan, members=members, form_data=form_data, loan_id=loan_id)
+    
+    # GET: Render with loan
+    return render_template('edit_loan.html', loan=loan, members=members)
+
 @app.route('/loan/delete/<loan_id>')
 def delete_loan(loan_id):
     try:
@@ -2000,7 +2050,7 @@ def print_loan():
                 # Fetch full member details (borrower)
                 with get_db_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute('SELECT full_name, father_name, spouse_name, address, marital_status FROM members WHERE id = ?', (loan['member_id'],))
+                    cursor.execute('SELECT full_name, father_name, spouse_name, address, marital_status, bank_branch, account_number FROM members WHERE id = ?', (loan['member_id'],))
                     member = cursor.fetchone()
                     if member:
                         loan['member_name'] = member['full_name'] or 'N/A'
@@ -2018,21 +2068,20 @@ def print_loan():
                         loan['spouse_name'] = None
                         loan['address'] = 'N/A'
                         loan['relation_prefix'] = 'D/o'
-                   
+                  
                     # Fetch guarantor name if exists
                     if loan['guarantor_id']:
                         cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['guarantor_id'],))
                         guarantor = cursor.fetchone()
                         loan['guarantor_name'] = guarantor[0] if guarantor else 'N/A'
-               
+              
                     # Compute repayment schedule (existing code)
                     if loan['emi_start_date']:
-                        balance = loan['amount'] or 0  # Principal balance for amortization
-                        total_due = loan['due_amount'] or (loan['emi'] * num_installments)  # Total payable
+                        balance = loan['amount'] or 0 # Principal balance for amortization
+                        total_due = loan['due_amount'] or (loan['emi'] * num_installments) # Total payable
                         start_date = datetime.strptime(loan['emi_start_date'], '%Y-%m-%d')
                         num_installments = loan['tenure_months'] if loan['repayment_type'] == 'monthly' else (loan['tenure_days'] or 120)
                         monthly_rate = (loan['interest_rate'] or 0) / 100 / 12 if loan['repayment_type'] == 'monthly' else 0
-
                         for i in range(1, num_installments + 1):
                             days_offset = 30 * (i - 1) if loan['repayment_type'] == 'monthly' else (i - 1)
                             installment_date = start_date + timedelta(days=days_offset)
@@ -2041,28 +2090,27 @@ def print_loan():
                             balance -= principal
                             if balance < 0:
                                 balance = 0
-                            
+                           
                             # NEW: Remaining Due after this installment: total_due - (i * emi)
                             remaining_due = round(total_due - (i * loan['emi']), 2)
                             if remaining_due < 0:
                                 remaining_due = 0
-                            
+                           
                             schedule.append({
                                 'installment': i,
                                 'date': installment_date.strftime('%Y-%m-%d'),
                                 'emi': round(loan['emi'], 2),
                                 'interest': round(interest, 2),
                                 'principal': round(principal, 2),
-                                'remaining_due': remaining_due  # NEW: Use this in template
-                            })   
+                                'remaining_due': remaining_due # NEW: Use this in template
+                            })
     return render_template('print_loan.html', loan=loan, error=error, current_date=current_date, schedule=schedule)
-
 @app.route('/get_loan_details/<loan_id>')
 def get_loan_details_route(loan_id):
     loan = get_loan_by_id(loan_id)
     if not loan:
         return jsonify({'error': 'Loan not found'})
-   
+  
     with get_db_connection() as conn:
         cursor = conn.cursor()
         # Fetch member details including mobile for WhatsApp
@@ -2071,11 +2119,11 @@ def get_loan_details_route(loan_id):
         loan['member_name'] = member['member_name'] if member else 'N/A'
         loan['father_name'] = member['father_name'] if member else 'N/A'
         loan['mobile'] = member['mobile'] if member else '7253946012' # Fallback
-   
+  
     # Add computed fields (discount assume 0, remaining = due - paid)
     loan['discount_amount'] = 0 # Or add DB field if needed
     loan['remaining_amount'] = round((loan['due_amount'] or 0) - (loan['total_paid'] or 0), 2)
-   
+  
     return jsonify(loan)
 # Update process_advance: Return JSON instead of redirect/flash
 @app.route('/process_advance', methods=['POST'])
@@ -2084,7 +2132,7 @@ def process_advance():
     pay_date = request.form['pay_date']
     payment_mode = request.form['payment_mode']
     advance_amount = float(request.form['advance_amount'])
-   
+  
     success, data = record_advance_payment(loan_id, pay_date, payment_mode, advance_amount)
     if success:
         # Return JSON for AJAX
@@ -2102,95 +2150,95 @@ def get_balance_sheet_data(balance_date_str):
         datetime.strptime(balance_date_str, '%Y-%m-%d').date() # Validate
     except ValueError:
         raise ValueError("Invalid date format: Use YYYY-MM-DD")
-   
+  
     with get_db_connection() as conn:
         cursor = conn.cursor()
-       
+      
         # NEW: Initial Investments as Cash Inflow (your model: investments fund cash pool)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM investments
             WHERE date <= ? AND type IN ('cash', 'initial') -- Assume 'cash' or 'initial' type for cash investments
         """, (balance_date_str,))
         investment_cash = cursor.fetchone()[0]
-       
+      
         # Existing: EMI Cash Inflow
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type = 'emi' AND payment_mode = 'Cash' AND pay_date <= ?
         """, (balance_date_str,))
         emi_cash = cursor.fetchone()[0]
-       
+      
         # Loan Cash Outflow
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode = 'Cash' AND loan_date <= ?
         """, (balance_date_str,))
         loan_cash = cursor.fetchone()[0]
-       
+      
         # Deposits Outflow
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM deposits
             WHERE deposit_date <= ? AND type = 'cash_deposit'
         """, (balance_date_str,))
         cash_deposited = cursor.fetchone()[0]
-       
+      
         # Updated Cash in Hand: Investments + EMI - Loans - Deposits
         total_inflow = investment_cash + emi_cash
         total_outflow = loan_cash + cash_deposited
         cash_in_hand = round(total_inflow - total_outflow, 2)
-       
+      
         # Bank Balance (unchanged)
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM payments
             WHERE type = 'emi' AND payment_mode = 'UPI' AND pay_date <= ?
         """, (balance_date_str,))
         emi_upi = cursor.fetchone()[0]
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM loans
             WHERE payment_mode IN ('NEFT', 'IMPS') AND loan_date <= ?
         """, (balance_date_str,))
         loan_neft_imps = cursor.fetchone()[0]
-       
+      
         bank_balance = round(emi_upi - loan_neft_imps + cash_deposited, 2)
-       
+      
         # Other sections unchanged
         cursor.execute("""
             SELECT COALESCE(SUM(due_amount), 0) FROM loans WHERE status = 'Active'
         """)
         loans_outstanding = max(0, round(cursor.fetchone()[0], 2))
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(amount), 0) FROM investments
             WHERE date <= ? AND type NOT IN ('cash', 'initial') -- Non-cash investments (e.g., fixed deposits)
         """, (balance_date_str,))
         investments = round(cursor.fetchone()[0], 2) # Now excludes cash investments
-       
+      
         cursor.execute("""
             SELECT COALESCE(SUM(outstanding_amount), 0) FROM borrowings WHERE due_date >= ?
         """, (balance_date_str,))
         borrowings = max(0, round(cursor.fetchone()[0], 2))
-       
+      
         # Retained Earnings from cumulative P&L
         cursor.execute("""
             SELECT COALESCE(SUM(interest_amount - COALESCE(expense_amount, 0)), 0) FROM cumulative_pnl
             WHERE period_end <= ?
         """, (balance_date_str,))
         retained_earnings = round(cursor.fetchone()[0], 2)
-       
+      
         # NEW: Compute Total Assets first
         total_assets = round(max(0, cash_in_hand) + max(0, bank_balance) + investments + loans_outstanding, 2)
-       
+      
         # NEW: Dynamic Capital Formula (from accounting: Capital = Assets - Liabilities - Retained Earnings)
         # This auto-balances the sheet
         capital = round(max(0, total_assets - (borrowings + retained_earnings)), 2)
-       
+      
         # Total Liabilities & Equity (now always equals Total Assets)
         total_liabilities_equity = round(borrowings + capital + retained_earnings, 2)
-       
+      
         # LOG for debugging (remove later)
         print(f"DEBUG Balance Sheet ({balance_date_str}): Total Assets=₹{total_assets}, Borrowings=₹{borrowings}, Retained=₹{retained_earnings}, Computed Capital=₹{capital}")
-       
+      
         return {
             'cash_in_hand': max(0, cash_in_hand),
             'bank_balance': max(0, bank_balance),
@@ -2202,13 +2250,13 @@ def get_balance_sheet_data(balance_date_str):
             'total_assets': total_assets,
             'total_liabilities_equity': total_liabilities_equity
         }
-   
+  
 @app.route('/get_balance_sheet')
 def get_balance_sheet():
     balance_date = request.args.get('date')
     if not balance_date:
         return jsonify({'error': 'Date required (YYYY-MM-DD)'}), 400
-   
+  
     try:
         data = get_balance_sheet_data(balance_date)
         # Add date to response for display
@@ -2273,7 +2321,7 @@ def get_loan_notice_details(loan_id):
     """Fetch details for legal notice: due amount, last EMI date, member info."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-       
+      
         # FIXED: JOIN on m.id (not m.member_id)
         cursor.execute("""
             SELECT l.loan_id, l.member_id, l.amount, l.emi, l.due_amount, l.loan_date, l.emi_start_date,
@@ -2285,9 +2333,9 @@ def get_loan_notice_details(loan_id):
         loan = cursor.fetchone()
         if not loan:
             return None
-       
+      
         loan_dict = dict(loan)
-       
+      
         # Get last EMI payment date
         cursor.execute("""
             SELECT MAX(pay_date) as last_emi_date
@@ -2296,23 +2344,23 @@ def get_loan_notice_details(loan_id):
         """, (loan_id,))
         last_payment = cursor.fetchone()
         loan_dict['last_emi_date'] = last_payment['last_emi_date'] or loan['loan_date'] # Fallback to loan_date if no payments
-       
+      
         # Format dates
         loan_dict['loan_date_formatted'] = datetime.strptime(loan_dict['loan_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
         loan_dict['last_emi_date_formatted'] = datetime.strptime(loan_dict['last_emi_date'], '%Y-%m-%d').strftime('%d/%m/%Y') if loan_dict['last_emi_date'] else 'No payments yet'
         loan_dict['emi_start_formatted'] = datetime.strptime(loan_dict['emi_start_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-       
+      
         # Due amount (use stored or compute if needed)
         loan_dict['due_amount_formatted'] = f"₹{loan_dict['due_amount']:.2f}"
-       
+      
         return loan_dict
-   
+  
 # Add this route after other routes (e.g., after /cash_deposit)
 @app.route('/legal_notice', methods=['GET', 'POST'])
 def legal_notice():
     notice_data = None
     error = None
-   
+  
     if request.method == 'POST':
         loan_id = request.form.get('loan_id', '').strip().upper()
         if not loan_id:
@@ -2321,7 +2369,7 @@ def legal_notice():
             notice_data = get_loan_notice_details(loan_id)
             if not notice_data:
                 error = f'Loan ID "{loan_id}" not found or not active.'
-   
+  
     return render_template('legal_notice.html', notice_data=notice_data, error=error)
 @app.route('/loan_settlement')
 def loan_settlement():
@@ -2353,7 +2401,7 @@ def settle_loan(loan_id):
             if not loan or loan['due_amount'] <= 0:
                 flash('Loan not found or already settled.', 'error')
                 return redirect(url_for('loan_settlement'))
-           
+          
             # Update loan
             cursor.execute("""
                 UPDATE loans
@@ -2361,53 +2409,53 @@ def settle_loan(loan_id):
                 WHERE loan_id = ?
             """, (datetime.now().strftime('%Y-%m-%d'), loan_id))
             conn.commit()
-           
+          
             # Get member name for flash
             cursor.execute("SELECT full_name FROM members WHERE id = ?", (loan['member_id'],))
             member_row = cursor.fetchone()
             member_name = member_row['full_name'] if member_row else 'Unknown'
-           
+          
             flash(f'Loan {loan_id} for {member_name} settled successfully!', 'success')
     except Exception as e:
         flash(f'Error settling loan: {str(e)}', 'error')
         current_app.logger.error(f"Settle loan error for {loan_id}: {e}")
-   
+  
     return redirect(url_for('loan_settlement'))
+
 @app.route('/add_penalty/<loan_id>', methods=['GET', 'POST'])
 def add_penalty(loan_id):
     loan = get_loan_by_id(loan_id)
-    if not loan or loan['status'] not in ['Active', 'Pending']: # <-- Add 'Pending'
-        flash('Loan not found or not eligible.', 'error')
+    if not loan:
+        flash('Loan not found.', 'error')
         return redirect(url_for('loan_list'))
-   
+
     # Fetch member name
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT full_name FROM members WHERE id = ?', (loan['member_id'],))
         member = cursor.fetchone()
-        loan['member_name'] = member[0] if member else 'N/A'
-   
+        loan['member_name'] = member['full_name'] if member else 'N/A'
+
     if request.method == 'POST':
         try:
             penalty_amount = float(request.form.get('penalty_amount', 0))
-            penalty_date = request.form.get('penalty_date', datetime.now().strftime('%Y-%m-%d'))
+            penalty_date = request.form.get('penalty_date')
             description = request.form.get('description', 'Penalty for late payment')
             payment_mode = request.form.get('payment_mode', 'Cash')
-           
-            if penalty_amount <= 0:
-                raise ValueError('Penalty amount must be positive.')
-           
+
             success, data = add_penalty_to_loan(loan_id, penalty_amount, penalty_date, description, payment_mode)
+            
             if success:
-                flash(f'Penalty of ₹{penalty_amount:.2f} added to loan {loan_id}. New due: ₹{data["new_due_amount"]:.2f}', 'success')
+                flash(f'Penalty of ₹{_round_amount(penalty_amount)} added successfully. New Due: ₹{data["new_due_amount"]}', 'success')
                 return redirect(url_for('loan_list'))
             else:
-                flash(f'Error: {data}', 'error')
-        except ValueError as e:
-            flash(str(e), 'error')
+                flash(data, 'error')
+                
+        except ValueError:
+            flash('Invalid penalty amount.', 'error')
         except Exception as e:
-            flash(f'Unexpected error: {e}', 'error')
-   
+            flash(f'Error: {e}', 'error')
+
     today = datetime.now().strftime('%Y-%m-%d')
     return render_template('add_penalty.html', loan=loan, today=today)
 
@@ -2554,6 +2602,34 @@ def borrower_status():
     return render_template('borrower_status.html', result=result, ledger_data=ledger_data,
                            loan_amount=loan_amount, paid=paid, remaining=remaining,
                            pending_emis_count=pending_emis_count)
+
+
+@app.route('/print_stamp', methods=['GET', 'POST'])
+@app.route('/print_stamp/<loan_id>')
+def print_stamp(loan_id=None):
+    if request.method == 'POST':
+        loan_id = request.form.get('loan_id')
+    
+    if not loan_id:
+        return "Loan ID required", 400
+
+    loan = get_loan_by_id(loan_id.strip().upper())
+    if not loan:
+        return render_template('print_stamp.html', loan=None, current_date=datetime.now().strftime('%d/%m/%Y'))
+
+    # Add member details
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT full_name, father_name, address FROM members WHERE id = ?", (loan['member_id'],))
+        member = cursor.fetchone()
+        if member:
+            loan['member_name'] = member['full_name']
+            loan['father_name'] = member['father_name']
+            loan['address'] = member['address']
+
+    return render_template('print_stamp.html', 
+                         loan=loan, 
+                         current_date=datetime.now().strftime('%d/%m/%Y %H:%M'))
 
 @app.route('/reports/<path:subpath>')
 @app.route('/company/<path:subpath>')
